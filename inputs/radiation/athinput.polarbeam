@@ -1,0 +1,75 @@
+<comment>
+problem   = Radiation beam test
+reference = 
+configure = --prob=beam
+
+<job>
+problem_id = beam        # problem ID: basename of output filenames
+
+#<output1>
+#file_type  = hst       # History data dump
+#dt         = 0.01      # time increment between outputs
+
+
+#<output2>
+#file_type  = vtk       # Binary data dump
+#variable   = prim      # variables to be output
+#dt         = 0.01       # time increment between outputs
+
+#<output3>
+#file_type  = rst       # Binary data dump
+#dt         = 0.00001       # time increment between outputs
+
+<output4>
+file_type  = hdf5       # Binary data dump
+dt         = 0.01       # time increment between outputs
+variable   = prim
+
+
+<time>
+cfl_number = 0.4       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1    # cycle limit
+tlim       = 100.0      # time limit
+
+<mesh>
+nx1        = 96       # Number of zones in X1-direction
+x1min      = 2.0      # minimum value of X1
+x1max      = 200.0      # maximum value of X1
+ix1_bc     = outflow  # inner-X1 boundary flag
+ox1_bc     = outflow  # inner-X1 boundary flag
+ix1_rad_bc = user
+ox1_rad_bc = vacuum
+
+nx2        = 64       # Number of zones in X2-direction
+x2min      = 0.0      # minimum value of X2
+x2max      = 3.14159265358979       # maximum value of X2
+ix2_bc     = polar  # inner-X2 boundary flag
+ox2_bc     = polar  # inner-X2 boundary flag
+ix2_rad_bc = polar
+ox2_rad_bc = polar
+
+
+nx3        = 64         # Number of zones in X3-direction
+x3min      = 0.0      # minimum value of X3
+x3max      = 6.28318530718      # maximum value of X3
+ix3_bc     = periodic  # inner-X3 boundary flag
+ox3_bc     = periodic  # inner-X3 boundary flag
+ix3_rad_bc = periodic
+ox3_rad_bc = periodic
+
+<meshblock>
+nx1         = 24 
+nx2         = 16 
+nx3         = 16
+
+
+<hydro>
+gamma           = 1.6666666666667       # gamma = C_p/C_v
+
+<radiation>
+nmu             = 1
+Prat            = 0
+Crat            = 10.0
+
+<problem>
+
