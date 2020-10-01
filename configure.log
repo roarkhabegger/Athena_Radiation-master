@@ -21,8 +21,8 @@ Your Athena++ distribution has now been configured with the following options:
   Floating-point precision:   double
   Number of ghost cells:      2
   MPI parallelism:            OFF
-  OpenMP parallelism:         ON
+  OpenMP parallelism:         OFF
   FFT:                        OFF
   HDF5 output:                OFF
   Compiler:                   g++
-  Compilation command:        g++  -O3 -std=c++11 -fopenmp
+  Compilation command:        g++  -O3 -std=c++11

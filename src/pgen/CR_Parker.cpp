@@ -59,7 +59,7 @@ static int direction =0;
 Real Ecr = 1.0;
 Real EcrBkg = .000001;
 Real crRad = 1.0;
-
+Real CRtLim = 0.0;
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 
@@ -108,9 +108,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Ecr = pin->GetReal("problem","CREner");
   EcrBkg = pin->GetReal("problem","BackgroundCREner");
   crRad = pin->GetReal("problem","CRRadius");
-  Real b0   = pin->GetReal("problem","Bx")
+  CRtLim = pin->GetReal("problem","CRtime");
+  Real b0   = pin->GetReal("problem","Bx");
   Real rho_h = pin->GetReal("problem","Dens");
-  Real scaleH = pin->GetReal("problem","ScaleHeight")
+  Real scaleH = pin->GetReal("problem","ScaleHeight");
   Real pgas=pin->GetReal("problem","Pres");
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -428,7 +429,7 @@ void FixCRsourceLeft(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=1; i<=ngh; ++i) {
-          Real x2 = pcoord->x2v(j);
+          Real x2 = pco->x2v(j);
           if ((time<CRtLim) && (std::abs(x2)<crRad)){
             u_cr(CRE,k,j,is-i) = Ecr;
             u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);

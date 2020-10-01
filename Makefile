@@ -15,7 +15,7 @@ MPIFFT_FILE =
 
 CXX := g++
 CPPFLAGS := 
-CXXFLAGS := -O3 -std=c++11 -fopenmp
+CXXFLAGS := -O3 -std=c++11
 LDFLAGS := 
 LDLIBS := 
 GCOV_CMD := gcov
