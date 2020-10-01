@@ -1,5 +1,5 @@
 Your Athena++ distribution has now been configured with the following options:
-  Problem generator:          cr_cloud
+  Problem generator:          CR_Parker
   Coordinate system:          cartesian
   Equation of state:          adiabatic
   Riemann solver:             hlld
@@ -9,7 +9,7 @@ Your Athena++ distribution has now been configured with the following options:
   General relativity:         OFF
   Radiative Transfer:         OFF
   Cosmic Ray Transport:       ON
-  Thermal Conduction:         OFF
+  Thermal Conduction:         ON
   Frame transformations:      OFF
   Self-Gravity:               OFF
   Aligned Option:             32
@@ -21,8 +21,8 @@ Your Athena++ distribution has now been configured with the following options:
   Floating-point precision:   double
   Number of ghost cells:      2
   MPI parallelism:            OFF
-  OpenMP parallelism:         OFF
+  OpenMP parallelism:         ON
   FFT:                        OFF
   HDF5 output:                OFF
   Compiler:                   g++
-  Compilation command:        g++  -O3 -std=c++11
+  Compilation command:        g++  -O3 -std=c++11 -fopenmp

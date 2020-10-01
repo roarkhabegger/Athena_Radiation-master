@@ -15,7 +15,7 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "cr_cloud"
+#define PROBLEM_GENERATOR "CR_Parker"
 
 // coordinate system
 #define COORDINATE_SYSTEM "cartesian"
@@ -55,7 +55,7 @@
 #define CR_ENABLED 1
 
 // include thermal conduction? default=0 (false)
-#define TC_ENABLED 0
+#define TC_ENABLED 1
 
 // enable special or general relativity? default=0 (false)
 #define RELATIVISTIC_DYNAMICS 0
@@ -82,7 +82,7 @@
 #define NOT_MPI_PARALLEL
 
 // OpenMP parallelization (OPENMP_PARALLEL or NOT_OPENMP_PARALLEL)
-#define NOT_OPENMP_PARALLEL
+#define OPENMP_PARALLEL
 
 // HDF5 output (HDF5OUTPUT or NO_HDF5OUTPUT)
 #define NO_HDF5OUTPUT
@@ -98,7 +98,7 @@
 // compiler options
 #define COMPILED_WITH "g++"
 #define COMPILER_COMMAND "g++"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11  " // NOLINT
+#define COMPILED_WITH_OPTIONS " -O3 -std=c++11 -fopenmp  " // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)

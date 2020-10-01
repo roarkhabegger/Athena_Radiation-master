@@ -3,7 +3,7 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = cr_cloud.cpp
+PROBLEM_FILE = CR_Parker.cpp
 COORDINATES_FILE = cartesian.cpp
 EOS_FILE = adiabatic_mhd.cpp
 GENERAL_EOS_FILE = noop.cpp
@@ -15,7 +15,7 @@ MPIFFT_FILE =
 
 CXX := g++
 CPPFLAGS := 
-CXXFLAGS := -O3 -std=c++11
+CXXFLAGS := -O3 -std=c++11 -fopenmp
 LDFLAGS := 
 LDLIBS := 
 GCOV_CMD := gcov

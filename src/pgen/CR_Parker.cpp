@@ -56,6 +56,9 @@ static Real vx = 0.0;
 static Real vy = 0.0;
 static Real vz = 0.0;
 static int direction =0;
+Real Ecr = 1.0;
+Real EcrBkg = .000001;
+Real crRad = 1.0;
 
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
@@ -101,39 +104,35 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     
   Real gamma = peos->GetGamma();
 
-  Real vx= pin->GetReal('problem','vx');
-  Real rho_c = 1.0;
-  Real rho_h = 0.1;
-  Real delta_z = 25.0;
-  Real z_back = 200.0;
-  Real z_front = 200.0;
-  Real pgas=1.0;
-
-  // The Nfmo
-
-// the anslytic solution form the co
-
+  Real vx=pin->GetReal("problem","xVel");
+  Ecr = pin->GetReal("problem","CREner");
+  EcrBkg = pin->GetReal("problem","BackgroundCREner");
+  crRad = pin->GetReal("problem","CRRadius");
+  Real b0   = pin->GetReal("problem","Bx")
+  Real rho_h = pin->GetReal("problem","Dens");
+  Real scaleH = pin->GetReal("problem","ScaleHeight")
+  Real pgas=pin->GetReal("problem","Pres");
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
-
         Real x1 = pcoord->x1v(i);
-        Real density = rho_h + (rho_c - rho_h) * 
-                               (1.0 + 1.0*tanh((x1-z_front)/delta_z))
-                              *(1.0 + 1.0*tanh((z_back-x1)/delta_z));
+        Real density = rho_h; //+ (rho_c - rho_h) * 
+                              // (1.0 + 1.0*tanh((x1-z_front)/delta_z))
+                              //*(1.0 + 1.0*tanh((z_back-x1)/delta_z));
+        Real pressure = pgas;
 
         phydro->u(IDN,k,j,i) = density;
 
-        phydro->u(IM1,k,j,i) = vx;
+        phydro->u(IM1,k,j,i) = vx*density;
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
         if (NON_BAROTROPIC_EOS){
-          phydro->u(IEN,k,j,i) = 0.5*vx*vx+pgas/(gamma-1.0);
+          phydro->u(IEN,k,j,i) = 0.5*density*vx*vx+pressure/(gamma-1.0);
         }
         
         if(CR_ENABLED){
-            pcr->u_cr(CRE,k,j,i) = 1.e-6;
+            pcr->u_cr(CRE,k,j,i) = EcrBkg;
             pcr->u_cr(CRF1,k,j,i) = 0.0;
             pcr->u_cr(CRF2,k,j,i) = 0.0;
             pcr->u_cr(CRF3,k,j,i) = 0.0;
@@ -169,7 +168,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=is; i<=ie+1; ++i) {
-          pfield->b.x1f(k,j,i) = 1.0;
+          pfield->b.x1f(k,j,i) = b0;
         }
       }
     }
@@ -425,19 +424,23 @@ void FixCRsourceLeft(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
     int js, int je, int ks, int ke, int ngh)
 {
 
-  Real fix_u = 3.0;
-
-
   if(CR_ENABLED){
-
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=1; i<=ngh; ++i) {
-          u_cr(CRE,k,j,is-i) = fix_u;
-          u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);
-          u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
-          u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is);
+          Real x2 = pcoord->x2v(j);
+          if ((time<CRtLim) && (std::abs(x2)<crRad)){
+            u_cr(CRE,k,j,is-i) = Ecr;
+            u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);
+            u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
+            u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is);
+          } else {
+            u_cr(CRE,k,j,is-i) = EcrBkg;
+            u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);
+            u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
+            u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is);
 
+          }
         }
       }
     }
