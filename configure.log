@@ -1,15 +1,15 @@
 Your Athena++ distribution has now been configured with the following options:
   Problem generator:          CR_Parker
   Coordinate system:          cartesian
-  Equation of state:          adiabatic
+  Equation of state:          isothermal
   Riemann solver:             hlld
   Magnetic fields:            ON
   Number of scalars:          0
   Special relativity:         OFF
   General relativity:         OFF
   Radiative Transfer:         OFF
-  Cosmic Ray Transport:       ON
-  Thermal Conduction:         ON
+  Cosmic Ray Transport:       OFF
+  Thermal Conduction:         OFF
   Frame transformations:      OFF
   Self-Gravity:               OFF
   Aligned Option:             32

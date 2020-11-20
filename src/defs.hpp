@@ -28,7 +28,7 @@
 #define SHEARING_BOX 0
 
 // Equation of state
-#define EQUATION_OF_STATE "adiabatic"
+#define EQUATION_OF_STATE "isothermal"
 
 // use general EOS framework default=0 (false).
 #define GENERAL_EOS 0
@@ -37,7 +37,7 @@
 #define EOS_TABLE_ENABLED 0
 
 // non-barotropic equation of state (i.e. P not simply a func of rho)? default=1 (true)
-#define NON_BAROTROPIC_EOS 1
+#define NON_BAROTROPIC_EOS 0
 
 // include magnetic fields? default=0 (false)
 #define MAGNETIC_FIELDS_ENABLED 1
@@ -52,10 +52,10 @@
 #define RADIATION_ENABLED 0
 
 // include cosmic ray transport? default=0 (false)
-#define CR_ENABLED 1
+#define CR_ENABLED 0
 
 // include thermal conduction? default=0 (false)
-#define TC_ENABLED 1
+#define TC_ENABLED 0
 
 // enable special or general relativity? default=0 (false)
 #define RELATIVISTIC_DYNAMICS 0
@@ -103,9 +103,9 @@
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
 
-#define NHYDRO 5
+#define NHYDRO 4
 #define NFIELD 3
-#define NWAVE 7
+#define NWAVE 6
 #define NSCALARS 0
 #define NGHOST 2
 #define NCR 4   // cosmic ray transport module variable

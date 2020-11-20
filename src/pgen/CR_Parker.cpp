@@ -56,10 +56,29 @@ static Real vx = 0.0;
 static Real vy = 0.0;
 static Real vz = 0.0;
 static int direction =0;
-Real Ecr = 1.0;
-Real EcrBkg = .000001;
-Real crRad = 1.0;
+Real Pcr = 0.0;
+Real PcrBkg = 0.0;//.000001;
+Real crFlux = 0.0;
+
+Real dens0 = 1.0;
+Real B0    = 1.0;
+Real E0    = 1.0;
+Real P0    = 1.0;
+
+Real crRad = 0.0;
+
 Real CRtLim = 0.0;
+Real H = 1.0;
+Real gH = 0.01;
+
+Real g0 = -1.0;
+
+Real LogMeshSpacingX2(Real x, RegionSize rs);
+
+void myGravity(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &cons);
+
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 
@@ -71,6 +90,31 @@ void FixCRsourceLeft(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
     AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
     int js, int je, int ks, int ke, int ngh);
 
+void FixMHDRight(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, 
+     int ks, int ke, int ngh);
+void FixCRsourceRight(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
+    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
+    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
+    int js, int je, int ks, int ke, int ngh);
+
+
+void FixMHDBottom(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+     FaceField &b, Real time, Real dt, int is, int ie, int js, int je, 
+     int ks, int ke, int ngh);
+void FixCRsourceBottom(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
+    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
+    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
+    int js, int je, int ks, int ke, int ngh);
+
+
+Real LogMeshSpacingX2(Real x, RegionSize rs){
+  Real xf, xrat;
+  xrat = pow(rs.x2max/rs.x2min,1.0/((Real) rs.nx2));
+  xf = rs.x2min*pow(xrat,x*rs.nx2); 
+  return xf;
+}
+
 void Mesh::UserWorkAfterLoop(ParameterInput *pin)
 { 
  
@@ -79,10 +123,26 @@ void Mesh::UserWorkAfterLoop(ParameterInput *pin)
 
 void Mesh::InitUserMeshData(ParameterInput *pin){
 
-  EnrollUserBoundaryFunction(inner_x1, FixMHDLeft);
-  if(CR_ENABLED)  
-    EnrollUserCRBoundaryFunction(inner_x1, FixCRsourceLeft);
+  Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
+  if (x2rat< 0.0) {
+    EnrollUserMeshGenerator(X2DIR,LogMeshSpacingX2);
+  }
 
+  if (pin->GetString("mesh","ix2_bc")=="user"){
+    EnrollUserBoundaryFunction(inner_x2, FixMHDBottom);
+  }
+  //if (pin->GetString("mesh","ix1_bc")=="user"){
+  //  EnrollUserBoundaryFunction(inner_x1, FixMHDLeft);
+  //}
+  //if (pin->GetString("mesh","ox1_bc")=="user"){
+  //  EnrollUserBoundaryFunction(outer_x1, FixMHDRight);
+  //}
+  EnrollUserExplicitSourceFunction(myGravity);
+  if(CR_ENABLED){  
+    EnrollUserCRBoundaryFunction(inner_x1, FixCRsourceLeft);
+    //EnrollUserCRBoundaryFunction(outer_x1, FixCRsourceRight);
+    //EnrollUserCRBoundaryFunction(inner_x2, FixCRsourceBottom);
+  }
 }
 
 
@@ -105,23 +165,33 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real gamma = peos->GetGamma();
 
   Real vx=pin->GetReal("problem","xVel");
-  Ecr = pin->GetReal("problem","CREner");
-  EcrBkg = pin->GetReal("problem","BackgroundCREner");
-  crRad = pin->GetReal("problem","CRRadius");
-  CRtLim = pin->GetReal("problem","CRtime");
-  Real b0   = pin->GetReal("problem","Bx");
-  Real rho_h = pin->GetReal("problem","Dens");
-  Real scaleH = pin->GetReal("problem","ScaleHeight");
-  Real pgas=pin->GetReal("problem","Pres");
+  Pcr = pin->GetReal("problem","CRPres");
+  PcrBkg = pin->GetReal("problem","BackgroundCRPres");
+
+  B0   = pin->GetReal("problem","Bx");
+  dens0 = pin->GetReal("problem","Dens");
+  H = pin->GetReal("problem","ScaleHeight");
+  gH = pin->GetReal("problem","gScaleHeight");
+  P0 = pin->GetReal("problem","Pres");
+  E0 = P0/(gamma-1)+PcrBkg*3.0;
+  g0 = pin->GetReal("problem","grav");
+
+  crFlux = 3.0*B0*Pcr/(sqrt(4.0*PI*dens0)) ;
+ 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
-        Real x1 = pcoord->x1v(i);
-        Real density = rho_h; //+ (rho_c - rho_h) * 
-                              // (1.0 + 1.0*tanh((x1-z_front)/delta_z))
-                              //*(1.0 + 1.0*tanh((z_back-x1)/delta_z));
-        Real pressure = pgas;
+        Real x2 = pcoord->x2v(j);
+         
+        Real prof = pow(cosh(x2/gH),-1.0*gH/H);
+        Real density = dens0*prof;  
+        Real pressure = P0*prof;
+        Real vel = vx;
+        Real crPress = PcrBkg*prof;
+        Real B =  B0*sqrt(prof);
+
+        Real gProf = g0*tanh(x2/(gH));
 
         phydro->u(IDN,k,j,i) = density;
 
@@ -129,14 +199,15 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
         if (NON_BAROTROPIC_EOS){
-          phydro->u(IEN,k,j,i) = 0.5*density*vx*vx+pressure/(gamma-1.0);
+          phydro->u(IEN,k,j,i) = (0.5*density*vx*vx+pressure/(gamma-1.0));
         }
         
         if(CR_ENABLED){
-            pcr->u_cr(CRE,k,j,i) = EcrBkg;
-            pcr->u_cr(CRF1,k,j,i) = 0.0;
+            pcr->u_cr(CRE,k,j,i) = 3.0*crPress;
+            pcr->u_cr(CRF1,k,j,i) = 3.0*B*crPress/sqrt(4.0*PI*density);
             pcr->u_cr(CRF2,k,j,i) = 0.0;
             pcr->u_cr(CRF3,k,j,i) = 0.0;
+            phydro->u(IEN,k,j,i) += 3.0*crPress;
         }
       }// end i
     }
@@ -169,7 +240,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=is; i<=ie+1; ++i) {
-          pfield->b.x1f(k,j,i) = b0;
+          Real x2 = pcoord->x2v(j);
+          //Real prof = exp(-x2/H);
+          Real prof = pow(cosh(x2/gH),-1.0*gH/H);
+          pfield->b.x1f(k,j,i) = B0*sqrt(prof);
         }
       }
     }
@@ -200,7 +274,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     // set cell centerd magnetic field
     // Add magnetic energy density to the total energy
     pfield->CalculateCellCenteredField(pfield->b,pfield->bcc,pcoord,is,ie,js,je,ks,ke);
-
+    E0 += 0.5*SQR(B0);
     for(int k=ks; k<=ke; ++k){
       for(int j=js; j<=je; ++j){
         for(int i=is; i<=ie; ++i){
@@ -218,13 +292,30 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   return;
 }
 
+void myGravity(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &cons) 
+{  
+  for (int k=pmb->ks; k<=pmb->ke; ++k) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
+#pragma omp simd
+      for (int i=pmb->is; i<=pmb->ie; ++i) {
+        Real x2 = pmb->pcoord->x2v(j);
+        Real gProf = g0*tanh(x2/(gH));
+        Real src = dt*prim(IDN,k,j,i)*gProf;
+        cons(IM2,k,j,i) += src;
+        if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) += src*prim(IVY,k,j,i);
+      }
+    }
+  }
+
+
+  return;
+}
 
 
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
-        AthenaArray<Real> &prim, AthenaArray<Real> &bcc)
-{ 
-
-
+        AthenaArray<Real> &prim, AthenaArray<Real> &bcc){ 
   // set the default opacity to be a large value in the default hydro case
   CosmicRay *pcr=pmb->pcr;
   int kl=pmb->ks, ku=pmb->ke;
@@ -243,11 +334,9 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
     for(int j=jl; j<=ju; ++j){
 #pragma omp simd
       for(int i=il; i<=iu; ++i){
-
         pcr->sigma_diff(0,k,j,i) = sigma;
         pcr->sigma_diff(1,k,j,i) = sigma;
         pcr->sigma_diff(2,k,j,i) = sigma;  
-
       }
     }
   }
@@ -260,9 +349,6 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
   // b_angle[1]=cos_theta_b
   // b_angle[2]=sin_phi_b
   // b_angle[3]=cos_phi_b
-
-
-
 
   if(MAGNETIC_FIELDS_ENABLED){
     //First, calculate B_dot_grad_Pc
@@ -281,34 +367,29 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         pmb->pcoord->CenterWidth2(k,j-1,il,iu,pcr->cwidth1);       
         pmb->pcoord->CenterWidth2(k,j,il,iu,pcr->cwidth);
         pmb->pcoord->CenterWidth2(k,j+1,il,iu,pcr->cwidth2);
-
         for(int i=il; i<=iu; ++i){
           Real distance = 0.5*(pcr->cwidth1(i) + pcr->cwidth2(i))
                          + pcr->cwidth(i);
           Real dprdy=(u_cr(CRE,k,j+1,i) - u_cr(CRE,k,j-1,i))/3.0;
           dprdy /= distance;
           pcr->b_grad_pc(k,j,i) += bcc(IB2,k,j,i) * dprdy;
-
         }
     // z component
         pmb->pcoord->CenterWidth3(k-1,j,il,iu,pcr->cwidth1);       
         pmb->pcoord->CenterWidth3(k,j,il,iu,pcr->cwidth);
         pmb->pcoord->CenterWidth3(k+1,j,il,iu,pcr->cwidth2);
-
         for(int i=il; i<=iu; ++i){
           Real distance = 0.5*(pcr->cwidth1(i) + pcr->cwidth2(i))
                           + pcr->cwidth(i);
           Real dprdz=(u_cr(CRE,k+1,j,i) - u_cr(CRE,k-1,j,i))/3.0;
           dprdz /= distance;
           pcr->b_grad_pc(k,j,i) += bcc(IB3,k,j,i) * dprdz;
-
           // now only get the sign
 //          if(pcr->b_grad_pc(k,j,i) > TINY_NUMBER) pcr->b_grad_pc(k,j,i) = 1.0;
 //          else if(-pcr->b_grad_pc(k,j,i) > TINY_NUMBER) pcr->b_grad_pc(k,j,i) 
 //            = -1.0;
 //          else pcr->b_grad_pc(k,j,i) = 0.0;
         }
-
       // now calculate the streaming velocity
       // streaming velocity is calculated with respect to the current coordinate 
       //  system
@@ -321,19 +402,14 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
           Real va1 = bcc(IB1,k,j,i)*inv_sqrt_rho;
           Real va2 = bcc(IB2,k,j,i)*inv_sqrt_rho;
           Real va3 = bcc(IB3,k,j,i)*inv_sqrt_rho;
-
           Real va = sqrt(pb/prim(IDN,k,j,i));
-
           Real dpc_sign = 0.0;
           if(pcr->b_grad_pc(k,j,i) > TINY_NUMBER) dpc_sign = 1.0;
           else if(-pcr->b_grad_pc(k,j,i) > TINY_NUMBER) dpc_sign = -1.0;
-          
           pcr->v_adv(0,k,j,i) = -va1 * dpc_sign;
           pcr->v_adv(1,k,j,i) = -va2 * dpc_sign;
           pcr->v_adv(2,k,j,i) = -va3 * dpc_sign;
-
           // now the diffusion coefficient
-
           if(va < TINY_NUMBER){
             pcr->sigma_adv(0,k,j,i) = pcr->max_opacity;
           }else{
@@ -341,10 +417,8 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
                           /(sqrt(pb)* va * (1.0 + 1.0/3.0) 
                                     * invlim * u_cr(CRE,k,j,i)); 
           }
-
           pcr->sigma_adv(1,k,j,i) = pcr->max_opacity;
           pcr->sigma_adv(2,k,j,i) = pcr->max_opacity;  
-
           // Now calculate the angles of B
           Real bxby = sqrt(bcc(IB1,k,j,i)*bcc(IB1,k,j,i) +
                            bcc(IB2,k,j,i)*bcc(IB2,k,j,i));
@@ -363,17 +437,11 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
             pcr->b_angle(2,k,j,i) = 0.0;
             pcr->b_angle(3,k,j,i) = 1.0;            
           }
-
         }//        
-
       }// end j
     }// end k
-
   }// End MHD  
   else{
-
-
-
   for(int k=kl; k<=ku; ++k){
     for(int j=jl; j<=ju; ++j){
   // x component
@@ -383,9 +451,7 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
                         + pcr->cwidth(i);
          Real grad_pr=(u_cr(CRE,k,j,i+1) - u_cr(CRE,k,j,i-1))/3.0;
          grad_pr /= distance;
-
          Real va = 1.0/sqrt(prim(IDN,k,j,i));
-
          if(va < TINY_NUMBER){
            pcr->sigma_adv(0,k,j,i) = pcr->max_opacity;
            pcr->v_adv(0,k,j,i) = 0.0;
@@ -400,21 +466,13 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
              pcr->v_adv(0,k,j,i) = -va * grad_pr/fabs(grad_pr);     
            }
         }
-
         pcr->sigma_adv(1,k,j,i) = pcr->max_opacity;
         pcr->sigma_adv(2,k,j,i) = pcr->max_opacity;
-       
         pcr->v_adv(1,k,j,i) = 0.0;
         pcr->v_adv(2,k,j,i) = 0.0;
-
-
-
-
       }
-
     }
   }
-
   }
 }
 
@@ -422,92 +480,84 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 void FixCRsourceLeft(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
     const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
-    int js, int je, int ks, int ke, int ngh)
-{
-
+    int js, int je, int ks, int ke, int ngh){
   if(CR_ENABLED){
     for (int k=ks; k<=ke; ++k) {
       for (int j=js; j<=je; ++j) {
         for (int i=1; i<=ngh; ++i) {
-          Real x2 = pco->x2v(j);
-          if ((time<CRtLim) && (std::abs(x2)<crRad)){
-            u_cr(CRE,k,j,is-i) = Ecr;
-            u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);
+          Real x2 = abs(pco->x2v(j));
+          //std::cout << "(" << i << "," << j << "," << k << ") up=" << upBound << ", lo=" << loBound <<std::endl; 
+          if ((time<CRtLim) && (x2 <= crRad)) {
+            u_cr(CRE,k,j,is-i) = 3.0*Pcr;
+            u_cr(CRF1,k,j,is-i) = crFlux;//u_cr(CRF1,k,j,is);
             u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
             u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is);
           } else {
-            u_cr(CRE,k,j,is-i) = EcrBkg;
-            u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is);
-            u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
-            u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is);
-
+            Real prof = exp(-1.0*abs(x2)/H);
+            u_cr(CRE,k,j,is-i) = 3.0*PcrBkg*prof;
+            u_cr(CRF1,k,j,is-i) = 3.0*B0*PcrBkg*pow(prof,1.5)/sqrt(4.0*PI*dens0);//u_cr(CRF1,k,j,is);
+            u_cr(CRF2,k,j,is-i) = 0.0;//u_cr(CRF2,k,j,is);
+            u_cr(CRF3,k,j,is-i) = 0.0;//u_cr(CRF3,k,j,is);
           }
         }
       }
     }
-
-
   }
 }
 
 
 
-void FixMHDLeft(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
+void FixMHDBottom(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
      FaceField &b, Real time, Real dt, int is, int ie, int js, int je, 
-     int ks, int ke, int ngh)
-{
-
+     int ks, int ke, int ngh){
   // copy hydro variables into ghost zones, reflecting v1
-
   for (int k=ks; k<=ke; ++k) {
-    for (int j=js; j<=je; ++j) {
-      for (int i=1; i<=ngh; ++i) {
-
-        prim(IDN,k,j,is-i) = prim(IDN,k,j,is);
-        prim(IVX,k,j,is-i) = -prim(IVX,k,j,is); // reflect 1-velocity
-        prim(IVY,k,j,is-i) = prim(IVY,k,j,is);
-        prim(IVZ,k,j,is-i) = prim(IVZ,k,j,is);
+    for (int i=is; i<=ie; ++i) {
+      for (int j=1; j<=ngh; ++j) {
+        Real x2 = pco->x2v(js-j);
+        Real prof = pow(cosh(x2/gH),-1.0*gH/H);
+        //Real prof = exp(-1.0*x2/H);
+        //std::cout << "j="<< js-j << " dens0=" << dens0 <<std::endl;
+        prim(IDN,k,js-j,i) = dens0;
+        prim(IVX,k,js-j,i) = 0.0; // reflect 1-velocity
+        prim(IVY,k,js-j,i) = 0.0;
+        prim(IVZ,k,js-j,i) = 0.0;
         if(NON_BAROTROPIC_EOS)
-          prim(IEN,k,j,is-i) = prim(IEN,k,j,is);
-//          prim(IEN,k,j,is-i) = 10.0;
-//         prim(IEN,k,j,is-i) = prim(IEN,k,j,is+i-1);
+          prim(IEN,k,js-j,i) = P0;
       }
     }
   }
-
-  
-
   // copy face-centered magnetic fields into ghost zones, reflecting b1
   if (MAGNETIC_FIELDS_ENABLED) {
     for (int k=ks; k<=ke; ++k) { 
-    for (int j=js; j<=je; ++j) { 
+    for (int i=is; i<=ie; ++i) { 
 #pragma simd
-      for (int i=1; i<=(NGHOST); ++i) { 
-//        b.x1f(k,j,(is-i)) = sqrt(2.0*const_pb);  // reflect 1-field
-          b.x1f(k,j,(is-i)) =  b.x1f(k,j,is);
+      for (int j=1; j<=(NGHOST); ++j) { 
+          b.x2f(k,js-j,i) =  0.0;
       } 
     }}
-    if(je > js){ 
+    if(ie > is){ 
      for (int k=ks; k<=ke; ++k) {
-     for (int j=js; j<=je+1; ++j) {
+     for (int i=is; i<=ie+1; ++i) {
 #pragma simd
-      for (int i=1; i<=(NGHOST); ++i) {
-        b.x2f(k,j,(is-i)) =  b.x2f(k,j,is);
+      for (int j=1; j<=(NGHOST); ++j) {
+        Real x2 = pco->x2v(js-j);
+        Real prof = pow(cosh(x2/gH),-1.0*gH/H);
+        //Real prof = exp(-1.0*x2/H);
+        b.x1f(k,js-j,i) =  B0*sqrt(prof);
       }
      }}  
     }
     if(ke > ks){        
      for (int k=ks; k<=ke+1; ++k) {
-      for (int j=js; j<=je; ++j) {
+      for (int i=is; i<=ie; ++i) {
 #pragma simd
-       for (int i=1; i<=(NGHOST); ++i) {
-         b.x3f(k,j,(is-i)) = b.x3f(k,j,is);
+       for (int j=1; j<=(NGHOST); ++j) {
+         b.x3f(k,js-j,i) = 0.0;
        }
       }}
     }
   }
-
-
 }
 
 
