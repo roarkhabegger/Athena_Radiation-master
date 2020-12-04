@@ -1,0 +1,57 @@
+<comment>
+problem   = Parker Instability from CR injection
+reference = 
+configure = --prob=CR_Parker
+
+<job>
+problem_id = parker        # problem ID: basename of output filenames
+
+<output1>
+file_type  = tab       # Binary data dump
+dt         = 10      # time increment between outputs
+variable   = prim
+
+<time>
+cfl_number = 0.3       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1    # cycle limit
+tlim       = 1262      # time limit
+ncycle_out      = 20000
+
+<mesh>
+nx1        = 32       # Number of zones in X1-direction
+x1min      = 0.0     # minimum value of X1
+x1max      = 200.0     # maximum value of X1
+ix1_bc     = periodic #user   # inner-X1 boundary flag
+ox1_bc     = periodic #user          # inner-X1 boundary flag
+
+x2rat      = 1.0
+nx2        = 128     # Number of zones in X2-direction
+x2min      = 0.01      # minimum value of X2
+x2max      = 1000.0       # maximum value of X2
+ix2_bc     = user   # inner-X2 boundary flag
+ox2_bc     = outflow # inner-X2 boundary flag
+
+
+
+nx3        = 1        # Number of zones in X3-direction
+x3min      = -0.1      # minimum value of X3
+x3max      = 0.1       # maximum value of X3
+ix3_bc     = reflecting  # inner-X3 boundary flag
+ox3_bc     = reflecting  # inner-X3 boundary flag
+
+
+<hydro>
+gamma           = 1.6666666666667       # gamma = C_p/C_v
+#iso_sound_speed = 1.0
+dfloor          = 1.e-15
+pfloor          = 1.e-15
+
+
+<problem>
+  xVel = 0.0
+  Dens = 100
+  ScaleHeight = 100.0
+  gScaleHeight = 100.0
+  Pres = 100.0
+  grav = -0.01 
+
