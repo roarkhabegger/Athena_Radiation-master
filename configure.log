@@ -1,7 +1,7 @@
 Your Athena++ distribution has now been configured with the following options:
-  Problem generator:          CR_Parker
+  Problem generator:          ParkerInst
   Coordinate system:          cartesian
-  Equation of state:          isothermal
+  Equation of state:          adiabatic
   Riemann solver:             hlld
   Magnetic fields:            ON
   Number of scalars:          0
@@ -19,7 +19,7 @@ Your Athena++ distribution has now been configured with the following options:
   Code coverage flags:        OFF
   Linker flags:                
   Floating-point precision:   double
-  Number of ghost cells:      2
+  Number of ghost cells:      3
   MPI parallelism:            OFF
   OpenMP parallelism:         OFF
   FFT:                        OFF

@@ -3,7 +3,7 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = CR_Parker.cpp
+PROBLEM_FILE = ParkerInst.cpp
 COORDINATES_FILE = cartesian.cpp
 EOS_FILE = adiabatic_mhd.cpp
 GENERAL_EOS_FILE = noop.cpp

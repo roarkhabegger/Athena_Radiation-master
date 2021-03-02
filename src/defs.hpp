@@ -15,7 +15,7 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "CR_Parker"
+#define PROBLEM_GENERATOR "ParkerInst"
 
 // coordinate system
 #define COORDINATE_SYSTEM "cartesian"
@@ -28,7 +28,7 @@
 #define SHEARING_BOX 0
 
 // Equation of state
-#define EQUATION_OF_STATE "isothermal"
+#define EQUATION_OF_STATE "adiabatic"
 
 // use general EOS framework default=0 (false).
 #define GENERAL_EOS 0
@@ -37,7 +37,7 @@
 #define EOS_TABLE_ENABLED 0
 
 // non-barotropic equation of state (i.e. P not simply a func of rho)? default=1 (true)
-#define NON_BAROTROPIC_EOS 0
+#define NON_BAROTROPIC_EOS 1
 
 // include magnetic fields? default=0 (false)
 #define MAGNETIC_FIELDS_ENABLED 1
@@ -103,11 +103,11 @@
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
 
-#define NHYDRO 4
+#define NHYDRO 5
 #define NFIELD 3
-#define NWAVE 6
+#define NWAVE 7
 #define NSCALARS 0
-#define NGHOST 2
+#define NGHOST 3
 #define NCR 4   // cosmic ray transport module variable
 #define NTC 4   // thermal conduction variable
 #define MAX_NSTAGE 5     // maximum number of stages per cycle for time-integrator
