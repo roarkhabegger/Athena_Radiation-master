@@ -170,9 +170,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         for (int i=is; i<=ie; i++) {
           Real x2 = pcoord->x2v(j);
           Real x1 = pcoord->x1v(i);
-          Real B = 0.2*B0;
-          B     *= exp(-1.0*pow(x2-3.0,2.0)/(2.0*pow(1.0,2.0)));
-          B     *= exp(-1.0*pow(x1-2.0,2.0)/(2.0*pow(0.5,2.0)));
+          Real B = 2.0*B0;
+          B     *= exp(-1.0*pow(x2-3.0,2.0)/(2.0*pow(0.1,2.0)));
+          B     *= exp(-1.0*pow(x1-2.0,2.0)/(2.0*pow(0.1,2.0)));
           pfield->b.x2f(k,j,i) = B;
         }
       }
