@@ -82,7 +82,7 @@
 #define NOT_MPI_PARALLEL
 
 // OpenMP parallelization (OPENMP_PARALLEL or NOT_OPENMP_PARALLEL)
-#define NOT_OPENMP_PARALLEL
+#define OPENMP_PARALLEL
 
 // HDF5 output (HDF5OUTPUT or NO_HDF5OUTPUT)
 #define NO_HDF5OUTPUT
@@ -98,7 +98,7 @@
 // compiler options
 #define COMPILED_WITH "g++"
 #define COMPILER_COMMAND "g++"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11  " // NOLINT
+#define COMPILED_WITH_OPTIONS " -O3 -std=c++11 -fopenmp  " // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
