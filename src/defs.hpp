@@ -52,7 +52,7 @@
 #define RADIATION_ENABLED 0
 
 // include cosmic ray transport? default=0 (false)
-#define CR_ENABLED 0
+#define CR_ENABLED 1
 
 // include thermal conduction? default=0 (false)
 #define TC_ENABLED 0
@@ -82,10 +82,10 @@
 #define NOT_MPI_PARALLEL
 
 // OpenMP parallelization (OPENMP_PARALLEL or NOT_OPENMP_PARALLEL)
-#define OPENMP_PARALLEL
+#define NOT_OPENMP_PARALLEL
 
 // HDF5 output (HDF5OUTPUT or NO_HDF5OUTPUT)
-#define NO_HDF5OUTPUT
+#define HDF5OUTPUT
 
 // debug build macros (DEBUG or NOT_DEBUG)
 #define NOT_DEBUG
@@ -98,7 +98,7 @@
 // compiler options
 #define COMPILED_WITH "g++"
 #define COMPILER_COMMAND "g++"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11 -fopenmp  " // NOLINT
+#define COMPILED_WITH_OPTIONS " -O3 -std=c++11   -lhdf5" // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)

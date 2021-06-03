@@ -8,7 +8,7 @@ Your Athena++ distribution has now been configured with the following options:
   Special relativity:         OFF
   General relativity:         OFF
   Radiative Transfer:         OFF
-  Cosmic Ray Transport:       OFF
+  Cosmic Ray Transport:       ON
   Thermal Conduction:         OFF
   Frame transformations:      OFF
   Self-Gravity:               OFF
@@ -17,12 +17,13 @@ Your Athena++ distribution has now been configured with the following options:
   Shearing Box BCs:           OFF
   Debug flags:                OFF
   Code coverage flags:        OFF
-  Linker flags:                
+  Linker flags:                 -lhdf5
   Floating-point precision:   double
   Number of ghost cells:      3
   MPI parallelism:            OFF
-  OpenMP parallelism:         ON
+  OpenMP parallelism:         OFF
   FFT:                        OFF
-  HDF5 output:                OFF
+  HDF5 output:                ON
+  HDF5 precision:             single
   Compiler:                   g++
-  Compilation command:        g++  -O3 -std=c++11 -fopenmp
+  Compilation command:        g++  -O3 -std=c++11

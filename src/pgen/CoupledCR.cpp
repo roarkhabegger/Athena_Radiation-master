@@ -53,34 +53,18 @@
 //======================================================================================
 
 Real dens0, pres0;
-Real H, Hg;
-Real g0;
 Real alpha;
 Real beta;
+Real angle;
+Real ampSin;
+Real ampLin;
+Real lambSin; 
+Real lambLin;
 
-Real crPertCenterX;
-Real crPertCenterY;
-Real crPertRadius;
-Real crPertAmp;
-Real crPertStartTime;
-Real crPertEndTime;
-Real crPertSteep;
+Real sigma;
 
-Real densProfile(Real x1, Real x2);
-Real presProfile(Real x1, Real x2);
-Real gravProfile(Real x1, Real x2);
-Real CRSourceProfile(Real x1, Real x2);
-
-Real LogMeshSpacingX2(Real x, RegionSize rs);
-
-void myGravity(MeshBlock *pmb, const Real time, const Real dt,
-               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
-               AthenaArray<Real> &cons);
-
-void myCRSource(MeshBlock *pmb, const Real time, const Real dt,
-                const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
-                AthenaArray<Real> &u_cr);
-
+void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
+        AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 
 void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                             FaceField &b, Real time, Real dt,
@@ -99,62 +83,61 @@ void ProjectCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
     AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
     int js, int je, int ks, int ke, int ngh);
 
-Real sigma;
+Real pres(Real x1, Real x2);
+Real GradP(Real x1, Real x2);
+Real dens(Real x1, Real x2);
 
-void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
-        AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 
+//======================================================================================
+// HYDRO PROFILES
+//======================================================================================
+Real pres(Real x1, Real x2) {
+  Real myVal = 0.0;
+  Real r = pow(pow(x2,2)+pow(x1,2),0.5);         
+  Real theta = atan2(x2,x1);
+  Real dist = r * cos(0.5*M_PI - angle - theta);
+  myVal = pres0*(1+ampLin*x2/lambLin + ampSin*sin(x2/lambSin));
 
-Real densProfile(Real x1, Real x2){
-  Real rho = dens0;
-  Real prof = pow(cosh(x2/Hg),-1.0*Hg/H);
-  rho *= prof;
-
-  return rho;
+  return myVal;
+ 
 }
-Real presProfile(Real x1, Real x2){
-  Real pres = pres0;
-  Real rho = densProfile(x1,x2);
-  pres *= rho/dens0;
+Real GradP(Real x1, Real x2) {
+  Real myVal = 0.0;
+  Real r = pow(pow(x2,2)+pow(x1,2),0.5);         
+  Real theta = atan2(x2,x1);
+  Real dist = r * cos(0.5*M_PI - angle - theta);
+  myVal = pres0*(ampLin/lambLin + ampSin/lambSin*cos(dist/lambSin));
 
-  return pres;
+  return myVal;
+ 
 }
+Real dens(Real x1, Real x2) {
+  Real myVal = 0.0;
+  Real r = pow(pow(x2,2)+pow(x1,2),0.5);         
+  Real theta = atan2(x2,x1);
+  Real dist = r * cos(0.5*M_PI - angle - theta);
+  myVal = dens0;//dens0*(1+ampLin*dist/lambLin + ampSin*sin(dist/lambSin));
 
-Real gravProfile(Real x1, Real x2){
-  Real g = g0 * tanh(x2/Hg);
-  return g;
-}
-
-Real LogMeshSpacingX2(Real x, RegionSize rs){
-  Real xf, xrat;
-  xrat = pow(rs.x2max/rs.x2min,1.0/((Real) rs.nx2));
-  xf = rs.x2min*pow(xrat,x*rs.nx2); 
-  return xf;
-}
-
-Real CRSourceProfile(Real x1, Real x2){
-  Real crE = 0.0;
-
-  return crE;
+  return myVal;
+ 
 }
 
 
+
+//======================================================================================
+// INITUSER_____DATA
+//======================================================================================
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
 
   if(CR_ENABLED){
-   // pcr->EnrollOpacityFunction(Diffusion);
-    pcr->EnrollUserCRSource(myCRSource);
+    pcr->EnrollOpacityFunction(Diffusion);
   }
 
 
 }
 void Mesh::InitUserMeshData(ParameterInput *pin){
 
-  Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
-  if (x2rat< 0.0) {
-    EnrollUserMeshGenerator(X2DIR,LogMeshSpacingX2);
-  }
   if (pin->GetString("mesh","ix2_bc")=="user"){
     EnrollUserBoundaryFunction(inner_x2, ProjectPressureInnerX2);
   }
@@ -162,57 +145,63 @@ void Mesh::InitUserMeshData(ParameterInput *pin){
     EnrollUserBoundaryFunction(outer_x2, ProjectPressureOuterX2);
   }
   
-  EnrollUserExplicitSourceFunction(myGravity);
   if(CR_ENABLED){
     EnrollUserCRBoundaryFunction(inner_x2, ProjectCRInnerX2);
     EnrollUserCRBoundaryFunction(outer_x2, ProjectCROuterX2);
   }
+  
 
 }
 
+//======================================================================================
+// PROB GENERATOR
+//======================================================================================
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
     
   Real gamma = peos->GetGamma();
 
-  Real vx=pin->GetReal("problem","xVel");
-  H = pin->GetReal("problem","ScaleHeight");
-  Hg = pin->GetReal("problem","gScaleHeight");
-  
   dens0 = pin->GetReal("problem","Dens");
-  g0 = pin->GetReal("problem","grav");
   pres0 = pin->GetReal("problem","Pres");
+  ampSin = pin->GetReal("problem","sinAmp");
+  ampLin = pin->GetReal("problem","linAmp");
+  lambSin = pin->GetReal("problem","sinLambda");
+  lambLin = pin->GetReal("problem","linLambda");
+
+
+  if (MAGNETIC_FIELDS_ENABLED) {
+    alpha = pin->GetOrAddReal("problem","alpha",0.0);
+    angle = pin->GetReal("problem","angle");
+  }
   if(CR_ENABLED){
-    crPertCenterX = pin->GetReal("problem","pertX");
-    crPertCenterY = pin->GetReal("problem","pertY");
-    crPertRadius = pin->GetReal("problem","pertR");
-    crPertAmp = pin->GetReal("problem","pertAmplitude");
-    crPertStartTime = pin->GetReal("problem","pertStart");
-    crPertEndTime = pin->GetReal("problem","pertEnd");
-    crPertSteep = pin->GetReal("problem","pertDx");
-  } 
+    beta = pin->GetOrAddReal("problem","beta",0.0);
+    sigma = pin->GetReal("cr","sigma");
+  }
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
         Real x2 = pcoord->x2v(j);
         Real x1 = pcoord->x1v(i);
-        Real density = densProfile(x1,x2);
-        Real pressure = presProfile(x1,x2);
-        phydro->u(IDN,k,j,i) = density;
-        phydro->u(IM1,k,j,i) = vx*density;
+        phydro->u(IDN,k,j,i) = dens(x1,x2);
+        phydro->u(IM1,k,j,i) = 0.0;
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
-        phydro->u(IEN,k,j,i) = pressure/(gamma-1) + 0.5*density*pow(vx,2.0);
+        phydro->u(IEN,k,j,i) = pres(x1,x2)/(gamma-1);
         if(CR_ENABLED){
-          beta = pin->GetOrAddReal("problem","beta",0.0);
-          Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
-          sigma = pin->GetReal("cr","sigma");
+          Real r = pow(pow(x2,2)+pow(x1,2),0.5);         
+          Real theta = atan2(x2,x1);
+          Real dist = r * cos(0.5*M_PI - angle - theta);
+          Real crp = beta*pres(x1,x2);
+          Real B0  = sqrt(alpha*pres0);
+          Real vs = B0/pow(4*PI*dens0,0.5)*cos(angle)*(-1)
+                    *(ampLin/lambLin+ampSin/lambSin*cos(dist/lambSin))
+                    /abs(ampLin/lambLin+ampSin/lambSin*cos(dist/lambSin));
+
           
-          pcr->u_cr(CRE,k,j,i) = 3.0*crp;// exp(-40.0*(dist_sq));
-          pcr->u_cr(CRF1,k,j,i) = 0.0;//vx*4.0*exp(-40.0*dist_sq)/(3.0*pcr->vmax) 
-                                 //+80*x1*exp(-40.0*dist_sq)/sigma;
-          pcr->u_cr(CRF2,k,j,i) = 0.0;
+          pcr->u_cr(CRE,k,j,i) = 3.0*crp;
+          pcr->u_cr(CRF1,k,j,i) = 0.0; 
+          pcr->u_cr(CRF2,k,j,i) = 0.0; //4.0*crp*vs;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
         }
       }// end i
@@ -220,18 +209,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   }    
     // initialize uniform interface B
   if (MAGNETIC_FIELDS_ENABLED) {
-    alpha = pin->GetOrAddReal("problem","alpha",0.0);
-    Real B0   = pow(2*alpha*pres0,0.5);
+    Real B0   = pow(alpha*pres0,0.5);
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie+1; i++) {
           Real x2 = pcoord->x2v(j);
-          Real x1 = pcoord->x1v(i);
-          Real pressure= presProfile(x1,x2);
 
-          Real B = B0*sqrt(pressure/pres0);
-
-          pfield->b.x1f(k,j,i) = B;
+          pfield->b.x1f(k,j,i) = 0.0;
           
           
         }
@@ -242,8 +226,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         for (int i=is; i<=ie; i++) {
           Real x2 = pcoord->x2v(j);
           Real x1 = pcoord->x1v(i);
-          Real B = B0;// 0.1*B0;
-          pfield->b.x2f(k,j,i) = 0.0;
+          pfield->b.x2f(k,j,i) = B0;
         }
       }
     }
@@ -289,23 +272,55 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   return;
 }
 
-void myGravity(MeshBlock *pmb, const Real time, const Real dt,
-  const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
-  AthenaArray<Real> &cons) 
-{ for (int k=pmb->ks; k<=pmb->ke; ++k) {
-    for (int j=pmb->js-NGHOST; j<=pmb->je+NGHOST; ++j) {
-#pragma omp simd
-      for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real x2 = pmb->pcoord->x2v(j);
-        Real x1 = pmb->pcoord->x1v(i);
-        Real gravity = gravProfile(x1,x2);
-        Real src = dt*prim(IDN,k,j,i)*gravity;
-        cons(IM2,k,j,i) += src;
-        if (NON_BAROTROPIC_EOS) cons(IEN,k,j,i) += src*prim(IVY,k,j,i);
+//======================================================================================
+// CR Boundary Conditions
+//======================================================================================
+void ProjectCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
+    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
+    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
+    int js, int je, int ks, int ke, int ngh)
+{
+  if(CR_ENABLED){
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=1; j<=ngh; ++j) {
+        for (int i=is; i<=ie; ++i) {
+	  Real dx1 = (pco->x2v(js-j) - pco->x2v(js-j+1));
+          Real dx2 = (pco->x2v(js-j+1) - pco->x2v(js-j+2));
+          u_cr(CRE,k,js-j,i) = dx1/dx2*( u_cr(CRE,k,js-j+1,i) - u_cr(CRE,k,js-j+2,i))
+			       + u_cr(CRE,k,js-j+1,i);
+          u_cr(CRF1,k,js-j,i) = 0.0; //u_cr(CRF1,k,j,is);
+          u_cr(CRF2,k,js-j,i) = dx1/dx2*( u_cr(CRF2,k,js-j+1,i) - u_cr(CRF2,k,js-j+2,i))
+			       + u_cr(CRF2,k,js-j+1,i);
+          //u_cr(CRF2,k,js-j,i) = 0.0; //u_cr(CRF2,k,j,is);
+          u_cr(CRF3,k,js-j,i) = 0.0; //u_cr(CRF3,k,j,is);
+
+        }
       }
     }
   }
-  return;
+}
+void ProjectCROuterX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
+    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
+    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
+    int js, int je, int ks, int ke, int ngh)
+{
+  if(CR_ENABLED){
+    for (int k=ks; k<=ke; ++k) {
+      for (int j=1; j<=ngh; ++j) {
+        for (int i=is; i<=ie; ++i) {
+	  Real dx1 = (pco->x2v(je+j) - pco->x2v(je+j-1));
+          Real dx2 = (pco->x2v(je+j-1) - pco->x2v(je+j-2));
+          u_cr(CRE,k,je+j,i) = dx1/dx2*( u_cr(CRE,k,je+j-1,i) - u_cr(CRE,k,je+j-2,i))
+			       + u_cr(CRE,k,je+j-1,i);
+          u_cr(CRF1,k,je+j,i) = 0.0; //u_cr(CRF1,k,j,is);
+          u_cr(CRF2,k,je+j,i) = dx1/dx2*( u_cr(CRF2,k,je+j-1,i) - u_cr(CRF2,k,je+j-2,i))
+			       + u_cr(CRF2,k,je+j-1,i);
+          //u_cr(CRF2,k,je+j,i) = 0.0; //u_cr(CRF2,k,j,is);
+          u_cr(CRF3,k,je+j,i) = 0.0; //u_cr(CRF3,k,j,is);
+        }
+      }
+    }
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -315,40 +330,33 @@ void myGravity(MeshBlock *pmb, const Real time, const Real dt,
 void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                             FaceField &b, Real time, Real dt,
                             int il, int iu, int jl, int ju, int kl, int ku, int ngh) {
+  //for (int n=0; n<(NHYDRO); ++n) {
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          Real x1 = pco->x1v(i);
-          Real x2 = pco->x2v(jl-j);
 	  Real dx1 = (pco->x2v(jl-j) - pco->x2v(jl-j+1));
           Real dx2 = (pco->x2v(jl-j+1) - pco->x2v(jl-j+2));
-          prim(IDN,k,jl-j,i) = densProfile(x1,x2);
-			       //dx1/dx2*( prim(IDN,k,jl-j+1,i) - prim(IDN,k,jl-j+2,i))
-			       //+ prim(IDN,k,jl-j+1,i);
+          prim(IDN,k,jl-j,i) = dx1/dx2*( prim(IDN,k,jl-j+1,i) - prim(IDN,k,jl-j+2,i))
+			       + prim(IDN,k,jl-j+1,i);
           prim(IVX,k,jl-j,i) = 0.0;
-          prim(IVY,k,jl-j,i) = -1.0*prim(IVY,k,jl+j-1,i);  // reflect 2-velocity
+          prim(IVY,k,jl-j,i) =  prim(IVY,k,jl+j-1,i);  // reflect 2-velocity
           prim(IVZ,k,jl-j,i) = 0.0;
-          prim(IPR,k,jl-j,i) = presProfile(x1,x2);
-			       //dx1/dx2*( prim(IPR,k,jl-j+1,i) - prim(IPR,k,jl-j+2,i))
-			       //+ prim(IPR,k,jl-j+1,i);
+          prim(IPR,k,jl-j,i) = dx1/dx2*( prim(IPR,k,jl-j+1,i) - prim(IPR,k,jl-j+2,i))
+			       + prim(IPR,k,jl-j+1,i);
         }
       }
     }
+  //}
 
   // copy face-centered magnetic fields into ghost zones, reflecting b2
   if (MAGNETIC_FIELDS_ENABLED) {
-    Real B0   = pow(2*alpha*pres0,0.5);
+    Real B0   = pow(alpha*pres0,0.5);
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu+1; ++i) {
-          Real x2 = pco->x2v(jl-j);
-          Real x1 = pco->x1v(i);
-          Real pressure= presProfile(x1,x2);
-
-          Real B = B0*sqrt(pressure/pres0);
-          b.x1f(k,(jl-j),i) =  B;
+          b.x1f(k,(jl-j),i) =  0.0;
         }
       }
     }
@@ -370,9 +378,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
       }
     }
   }
-  return;
 }
-
 //----------------------------------------------------------------------------------------
 //! \fn void ProjectPressureOuterX2()
 //  \brief  Pressure is integated into ghost cells to improve hydrostatic eqm
@@ -380,40 +386,33 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
 void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                             FaceField &b, Real time, Real dt,
                             int il, int iu, int jl, int ju, int kl, int ku, int ngh) {
+  //for (int n=0; n<(NHYDRO); ++n) {
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          Real x1 = pco->x1v(i);
-          Real x2 = pco->x2v(ju+j);
 	  Real dx1 = (pco->x2v(ju+j) - pco->x2v(ju+j-1));
           Real dx2 = (pco->x2v(ju+j-1) - pco->x2v(ju+j-2));
-          prim(IDN,k,ju+j,i) = densProfile(x1,x2);
-			       //dx1/dx2*( prim(IDN,k,ju+j-1,i) - prim(IDN,k,ju+j-2,i))
-	           	       //+ prim(IDN,k,ju+j-1,i);
+          prim(IDN,k,ju+j,i) = dx1/dx2*( prim(IDN,k,ju+j-1,i) - prim(IDN,k,ju+j-2,i))
+	           	       + prim(IDN,k,ju+j-1,i);
           prim(IVX,k,ju+j,i) = 0.0;
-          prim(IVY,k,ju+j,i) = -1.0*prim(IVY,k,ju-j+1,i);  // reflect 2-velocity
+          prim(IVY,k,ju+j,i) = prim(IVY,k,ju-j+1,i);  // reflect 2-velocity
           prim(IVZ,k,ju+j,i) = 0.0;
-          prim(IPR,k,ju+j,i) = presProfile(x1,x2);
-			       //dx1/dx2*( prim(IPR,k,ju+j-1,i) - prim(IPR,k,ju+j-2,i))
-	           	       //+ prim(IPR,k,ju+j-1,i);
+          prim(IPR,k,ju+j,i) = dx1/dx2*( prim(IPR,k,ju+j-1,i) - prim(IPR,k,ju+j-2,i))
+	           	       + prim(IPR,k,ju+j-1,i);
         }
       }
     }
+  //}
 
   // copy face-centered magnetic fields into ghost zones, reflecting b2
   if (MAGNETIC_FIELDS_ENABLED) {
-    Real B0   = pow(2*alpha*pres0,0.5);
+    Real B0   = pow(alpha*pres0,0.5);
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu+1; ++i) {
-          Real x2 = pco->x2v(ju+j);
-          Real x1 = pco->x1v(i);
-          Real pressure= presProfile(x1,x2);
-
-          Real B = B0*sqrt(pressure/pres0);
-          b.x1f(k,(ju+j),i) =  B;
+          b.x1f(k,(ju+j),i) =  0.0;
         }
       }
     }
@@ -437,102 +436,10 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
     }
 
   }
-  return;
 }
+
+
 //======================================================================================
-// CR Boundary Conditions
-//======================================================================================
-void ProjectCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
-    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
-    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
-    int js, int je, int ks, int ke, int ngh)
-{
-  if(CR_ENABLED){
-    for (int k=ks; k<=ke; ++k) {
-      for (int j=1; j<=ngh; ++j) {
-        for (int i=is; i<=ie; ++i) {
-          Real x1 = pco->x1v(i);
-          Real x2 = pco->x2v(js-j);
-	  Real dx1 = (pco->x2v(js-j) - pco->x2v(js-j+1));
-          Real dx2 = (pco->x2v(js-j+1) - pco->x2v(js-j+2));
-          u_cr(CRE,k,js-j,i) = beta*presProfile(x1,x2)*3; 
-				//dx1/dx2*( u_cr(CRE,k,js-j+1,i) - u_cr(CRE,k,js-j+2,i))
-			       //+ u_cr(CRE,k,js-j+1,i);
-          u_cr(CRF1,k,js-j,i) = 0.0; //u_cr(CRF1,k,j,is);
-          u_cr(CRF2,k,js-j,i) = u_cr(CRF2,k,js+j-1,i);
-				//dx1/dx2*( u_cr(CRF2,k,js-j+1,i) - u_cr(CRF2,k,js-j+2,i))
-			       //+ u_cr(CRF2,k,js-j+1,i);
-          //u_cr(CRF2,k,js-j,i) = 0.0; //u_cr(CRF2,k,j,is);
-          u_cr(CRF3,k,js-j,i) = 0.0; //u_cr(CRF3,k,j,is);
-
-        }
-      }
-    }
-  }
-}
-void ProjectCROuterX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr, 
-    const AthenaArray<Real> &w, const AthenaArray<Real> &bcc,
-    AthenaArray<Real> &u_cr, Real time, Real dt, int is, int ie, 
-    int js, int je, int ks, int ke, int ngh)
-{
-  if(CR_ENABLED){
-    for (int k=ks; k<=ke; ++k) {
-      for (int j=1; j<=ngh; ++j) {
-        for (int i=is; i<=ie; ++i) {
-          Real x1 = pco->x1v(i);
-          Real x2 = pco->x2v(je+j);
-	  Real dx1 = (pco->x2v(je+j) - pco->x2v(je+j-1));
-          Real dx2 = (pco->x2v(je+j-1) - pco->x2v(je+j-2));
-          u_cr(CRE,k,je+j,i) = beta*presProfile(x1,x2)*3;
-				//dx1/dx2*( u_cr(CRE,k,je+j-1,i) - u_cr(CRE,k,je+j-2,i))
-			       //+ u_cr(CRE,k,je+j-1,i);
-          u_cr(CRF2,k,je+j,i) = u_cr(CRF2,k,je-j+1,i); //u_cr(CRF1,k,j,is);
-          u_cr(CRF1,k,je+j,i) = 0.0;
-				//dx1/dx2*( u_cr(CRF2,k,je+j-1,i) - u_cr(CRF2,k,je+j-2,i))
-			       //+ u_cr(CRF2,k,je+j-1,i);
-          //u_cr(CRF2,k,je+j,i) = 0.0; //u_cr(CRF2,k,j,is);
-          u_cr(CRF3,k,je+j,i) = 0.0; //u_cr(CRF3,k,j,is);
-        }
-      }
-    }
-  }
-}
-
-//----------------------------------------------------------------------------------------
-void myCRSource(MeshBlock *pmb, const Real time, const Real dt,
-                const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
-                AthenaArray<Real> &u_cr){
-  //CR Source function
-  int is = pmb->is;
-  int ie = pmb->ie;
-  int js = pmb->js;
-  int je = pmb->je;
-  int ks = pmb->ks;
-  int ke = pmb->ke;
-
-  if (CR_ENABLED) {
-    if ((time >= crPertStartTime)&&(time<crPertEndTime)){
-      Real myVal = 0.0;
-      for(int k=ks; k<=ke; ++k) {
-        for (int j=js; j<=je; ++j) {
-          for (int i=is; i<=ie; ++i) {
-            Real x1 = pmb->pcoord->x1v(i);
-            Real x2 = pmb->pcoord->x2v(j);
-            myVal = 0.0;
-            
-            Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-            
-            myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh(dist/crPertSteep));
- 
-            u_cr(CRE,k,j,i) += myVal;
-          }
-        }
-      }
-    }
-  }
-  return;
-}
-//----------------------------------------------------------------------------------------
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr, 
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc)
 { 
