@@ -180,10 +180,10 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 }
 void Mesh::InitUserMeshData(ParameterInput *pin){
 
-  Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
-  if (x2rat< 0.0) {
-    EnrollUserMeshGenerator(X2DIR,LogMeshSpacingX2);
-  }
+//  Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
+//  if (x2rat< 0.0) {
+//    EnrollUserMeshGenerator(X2DIR,LogMeshSpacingX2);
+//  }
   if (pin->GetString("mesh","ix2_bc")=="user"){
     EnrollUserBoundaryFunction(inner_x2, ProjectPressureInnerX2);
   }
@@ -209,7 +209,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin){
       EnrollUserCRBoundaryFunction(outer_x1, ProfilesCROuterX1);
   //  EnrollUserTimeStepFunction(CRSourceTimeStep);
   }
-  if (adaptive==true) EnrollUserRefinementCondition(RefinementCondition);
+  //if (adaptive==true) EnrollUserRefinementCondition(RefinementCondition);
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
@@ -218,12 +218,16 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real gamma = peos->GetGamma();
 
   vx=pin->GetReal("problem","xVel");
-  H = pin->GetReal("problem","ScaleHeight");
+  //H = pin->GetReal("problem","ScaleHeight");
   nGrav = pin->GetReal("problem","GravNumScaleHeight");
+  beta = pin->GetOrAddReal("problem","beta",0.0);
+  alpha = pin->GetOrAddReal("problem","alpha",0.0);
   
   dens0 = pin->GetReal("problem","Dens");
   g0 = pin->GetReal("problem","grav");
   pres0 = pin->GetReal("problem","Pres");
+  H = pres0/dens0/(-1.0*g0)*(1+alpha+beta);
+
   if(CR_ENABLED){
     crPertCenterX = pin->GetReal("problem","pertX");
     crPertCenterY = pin->GetReal("problem","pertY");
@@ -236,8 +240,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
+      
+      Real x2 = pcoord->x2v(j);
       for (int i=is; i<=ie; ++i) {
-        Real x2 = pcoord->x2v(j);
         Real x1 = pcoord->x1v(i);
         Real density = densProfile(x1,x2);
         Real pressure = presProfile(x1,x2);
@@ -248,35 +253,28 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM3,k,j,i) = 0.0;
         phydro->u(IEN,k,j,i) = pressure/(gamma-1) + 0.5*density*pow(vx,2.0);
         if(CR_ENABLED){
-          beta = pin->GetOrAddReal("problem","beta",0.0);
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
           sigma = pin->GetReal("cr","sigma");
           Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-          Real myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh(dist/crPertSteep));
+          Real myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
           
           pcr->u_cr(CRE,k,j,i) = 3.0*crp+myVal;// exp(-40.0*(dist_sq));
           pcr->u_cr(CRF1,k,j,i) = 0.0;//vx*4.0*exp(-40.0*dist_sq)/(3.0*pcr->vmax) 
                                  //+80*x1*exp(-40.0*dist_sq)/sigma;
           pcr->u_cr(CRF2,k,j,i) = 0.0;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
-          //Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-            
-          //myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh(dist/crPertSteep));
- 
-          //u_cr(CRE,k,j,i) += myVal*(1-exp(-1*time/cpPertStartTime))*exp(-1*time/cpPertEndTime);
         }
       }// end i
     }
   }    
     // initialize uniform interface B
   if (MAGNETIC_FIELDS_ENABLED) {
-    alpha = pin->GetOrAddReal("problem","alpha",0.0);
     Real B0   = pow(2*alpha*pres0,0.5);
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie+1; i++) {
           Real x2 = pcoord->x2v(j);
-          Real x1 = pcoord->x1v(i);
+          Real x1 = pcoord->x1f(i);
           Real pressure= presProfile(x1,x2);
 
           Real B = B0*sqrt(pressure/pres0);
@@ -290,7 +288,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je+1; j++) {
         for (int i=is; i<=ie; i++) {
-          Real x2 = pcoord->x2v(j);
+          Real x2 = pcoord->x2f(j);
           Real x1 = pcoord->x1v(i);
           Real B = B0;// 0.1*B0;
           pfield->b.x2f(k,j,i) = 0.0;
@@ -308,10 +306,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       for (int k=ks; k<=ke; k++) {
         for (int j=js; j<=je; j++) {
           for (int i=is; i<=ie; i++) {
-            phydro->u(IEN,k,j,i) += 0.5*( pow(pfield->b.x1f(k,j,i),2.0)
-                                         +pow(pfield->b.x2f(k,j,i),2.0)
-                                         +pow(pfield->b.x3f(k,j,i),2.0)
-                                         );
+            Real x2 = pcoord->x2v(j);
+            Real x1 = pcoord->x1v(i);
+            Real pressure= presProfile(x1,x2);
+
+            Real B = B0*sqrt(pressure/pres0);
+
+            phydro->u(IEN,k,j,i) += 0.5*( pow(B,2.0));
           }
         }
       }
@@ -343,7 +344,7 @@ void myGravity(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &cons) 
 { for (int k=pmb->ks; k<=pmb->ke; ++k) {
-    for (int j=pmb->js-NGHOST; j<=pmb->je+NGHOST; ++j) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
 #pragma omp simd
       for (int i=pmb->is; i<=pmb->ie; ++i) {
         Real x2 = pmb->pcoord->x2v(j);
@@ -359,7 +360,7 @@ void myGravity(MeshBlock *pmb, const Real time, const Real dt,
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn ProfilesOuterX1()
+//! \fn ProfilesInnerX1()
 //  \brief  Pressure is integated into ghost cells to improve hydrostatic eqm
 void ProfilesInnerX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, FaceField &b,
       Real time, Real dt, int is, int ie, int js, int je, int ks, int ke, int ngh)
@@ -445,8 +446,8 @@ void ProfilesOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, 
     }
   }
    // set magnetic field in inlet ghost zones
-  edge = pco->x1f(ie+1); 
   if (MAGNETIC_FIELDS_ENABLED) {
+    Real fedge = pco->x1f(ie+1); 
     Real B0   = pow(2*alpha*pres0,0.5);
     for(int k=ks; k<=ke; ++k){
     for(int j=js; j<=je; ++j){
@@ -457,7 +458,7 @@ void ProfilesOuterX1(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim, 
           Real pressure= presProfile(x1,x2);
 
           Real B = B0*sqrt(pressure/pres0);
-        b.x1f(k,j,ie+i) = B;//+(b.x1f(ie+1)-B0*sqrt(presProfile(edge,x2)/pres0));
+        b.x1f(k,j,ie+i) = B+(b.x1f(k,j,ie+1)-B0*sqrt(presProfile(fedge,x2)/pres0));
       }
     }}
 
@@ -513,7 +514,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
 
   // copy face-centered magnetic fields into ghost zones, reflecting b2
   if (MAGNETIC_FIELDS_ENABLED) {
-    edge = pco->x2v(jl);
+    Real fedge = pco->x2v(jl);
     Real B0   = pow(2*alpha*pres0,0.5);
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
@@ -524,7 +525,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
           Real pressure= presProfile(x1,x2);
 
           Real B = B0*sqrt(pressure/pres0);
-          b.x1f(k,(jl-j),i) =  B + (b.x1f(k,jl,i) - B0*sqrt(presProfile(x1,edge)/pres0));
+          b.x1f(k,(jl-j),i) =  B + (b.x1f(k,jl,i) - B0*sqrt(presProfile(x1,fedge)/pres0));
         }
       }
     }
@@ -556,40 +557,37 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
 void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
                             FaceField &b, Real time, Real dt,
                             int il, int iu, int jl, int ju, int kl, int ku, int ngh) {
+    Real edge = pco->x2v(ju);
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
           Real x1 = pco->x1v(i);
           Real x2 = pco->x2v(ju+j);
-	  Real dx1 = (pco->x2v(ju+j) - pco->x2v(ju+j-1));
-          Real dx2 = (pco->x2v(ju+j-1) - pco->x2v(ju+j-2));
-          prim(IDN,k,ju+j,i) = densProfile(x1,x2);
-			       //dx1/dx2*( prim(IDN,k,ju+j-1,i) - prim(IDN,k,ju+j-2,i))
-	           	       //+ prim(IDN,k,ju+j-1,i);
+
+          prim(IDN,k,ju+j,i) = densProfile(x1,x2)+(prim(IDN,k,ju,i) - densProfile(x1,edge));
           prim(IVX,k,ju+j,i) = prim(IVX,k,ju,i);
           prim(IVY,k,ju+j,i) = prim(IVY,k,ju,i);  // reflect 2-velocity
           prim(IVZ,k,ju+j,i) = prim(IVZ,k,ju,i);
-          prim(IPR,k,ju+j,i) = presProfile(x1,x2);
-			       //dx1/dx2*( prim(IPR,k,ju+j-1,i) - prim(IPR,k,ju+j-2,i))
-	           	       //+ prim(IPR,k,ju+j-1,i);
+          prim(IPR,k,ju+j,i) = presProfile(x1,x2)+(prim(IPR,k,ju,i) - presProfile(x1,edge));
         }
       }
     }
 
   // copy face-centered magnetic fields into ghost zones, reflecting b2
   if (MAGNETIC_FIELDS_ENABLED) {
+    Real fedge = pco->x2v(ju);
     Real B0   = pow(2*alpha*pres0,0.5);
     for (int k=kl; k<=ku; ++k) {
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu+1; ++i) {
-          Real x2 = pco->x2f(ju+j);
+          Real x2 = pco->x2v(ju+j);
           Real x1 = pco->x1f(i);
           Real pressure= presProfile(x1,x2);
 
           Real B = B0*sqrt(pressure/pres0);
-          b.x1f(k,(ju+j),i) =  B;
+          b.x1f(k,(ju+j),i) =  B + (b.x1f(k,ju,i)-B0*sqrt(presProfile(x1,fedge)/pres0));
         }
       }
     }
@@ -629,14 +627,9 @@ void ProfilesCRInnerX1(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
         for (int i=1; i<=ngh; ++i) {
           Real x1 = pco->x1v(is-i);
           Real x2 = pco->x2v(j);
-          u_cr(CRE,k,j,is-i) = beta*presProfile(x1,x2)*3; 
-				//dx1/dx2*( u_cr(CRE,k,js-j+1,i) - u_cr(CRE,k,js-j+2,i))
-			       //+ u_cr(CRE,k,js-j+1,i);
+          u_cr(CRE,k,j,is-i) = 3.0*beta*(presProfile(x1,x2) - presProfile(pco->x1v(is),x2)) + u_cr(CRE,k,j,is); 
           u_cr(CRF1,k,j,is-i) = u_cr(CRF1,k,j,is); //u_cr(CRF1,k,j,is);
           u_cr(CRF2,k,j,is-i) = u_cr(CRF2,k,j,is);
-				//dx1/dx2*( u_cr(CRF2,k,js-j+1,i) - u_cr(CRF2,k,js-j+2,i))
-			       //+ u_cr(CRF2,k,js-j+1,i);
-          //u_cr(CRF2,k,js-j,i) = 0.0; //u_cr(CRF2,k,j,is);
           u_cr(CRF3,k,j,is-i) = u_cr(CRF3,k,j,is); //u_cr(CRF3,k,j,is);
 
         }
@@ -656,14 +649,10 @@ void ProfilesCROuterX1(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
         for (int i=1; i<=ngh; ++i) {
           Real x1 = pco->x1v(ie+i);
           Real x2 = pco->x2v(j);
-          u_cr(CRE,k,j,ie+i) = beta*presProfile(x1,x2)*3; 
-				//dx1/dx2*( u_cr(CRE,k,js-j+1,i) - u_cr(CRE,k,js-j+2,i))
-			       //+ u_cr(CRE,k,js-j+1,i);
+          u_cr(CRE,k,j,ie+i) = 3.0*beta*(presProfile(x1,x2) - presProfile(pco->x1v(ie),x2)) + u_cr(CRE,k,j,ie); 
           u_cr(CRF1,k,j,ie+i) = u_cr(CRF1,k,j,ie); //u_cr(CRF1,k,j,is);
           u_cr(CRF2,k,j,ie+i) = u_cr(CRF2,k,j,ie);
-				//dx1/dx2*( u_cr(CRF2,k,js-j+1,i) - u_cr(CRF2,k,js-j+2,i))
-			       //+ u_cr(CRF2,k,js-j+1,i);
-          //u_cr(CRF2,k,js-j,i) = 0.0; //u_cr(CRF2,k,j,is);
+
           u_cr(CRF3,k,j,ie+i) = u_cr(CRF3,k,j,ie); //u_cr(CRF3,k,j,is);
 
         }
@@ -683,16 +672,10 @@ void ProjectCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
         for (int i=is; i<=ie; ++i) {
           Real x1 = pco->x1v(i);
           Real x2 = pco->x2v(js-j);
-	  Real dx1 = (pco->x2v(js-j) - pco->x2v(js-j+1));
-          Real dx2 = (pco->x2v(js-j+1) - pco->x2v(js-j+2));
-          u_cr(CRE,k,js-j,i) = beta*presProfile(x1,x2)*3; 
-				//dx1/dx2*( u_cr(CRE,k,js-j+1,i) - u_cr(CRE,k,js-j+2,i))
-			       //+ u_cr(CRE,k,js-j+1,i);
+
+          u_cr(CRE,k,js-j,i) = 3.0*beta*(presProfile(x1,x2)-presProfile(x1,pco->x2v(js))) + u_cr(CRE,k,js,i); 
           u_cr(CRF1,k,js-j,i) = u_cr(CRF1,k,js,i); //u_cr(CRF1,k,j,is);
           u_cr(CRF2,k,js-j,i) = u_cr(CRF2,k,js,i);
-				//dx1/dx2*( u_cr(CRF2,k,js-j+1,i) - u_cr(CRF2,k,js-j+2,i))
-			       //+ u_cr(CRF2,k,js-j+1,i);
-          //u_cr(CRF2,k,js-j,i) = 0.0; //u_cr(CRF2,k,j,is);
           u_cr(CRF3,k,js-j,i) = u_cr(CRF3,k,js,i); //u_cr(CRF3,k,j,is);
 
         }
@@ -712,16 +695,10 @@ void ProjectCROuterX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
         for (int i=is; i<=ie; ++i) {
           Real x1 = pco->x1v(i);
           Real x2 = pco->x2v(je+j);
-	  Real dx1 = (pco->x2v(je+j) - pco->x2v(je+j-1));
-          Real dx2 = (pco->x2v(je+j-1) - pco->x2v(je+j-2));
-          u_cr(CRE,k,je+j,i) = beta*presProfile(x1,x2)*3;
-				//dx1/dx2*( u_cr(CRE,k,je+j-1,i) - u_cr(CRE,k,je+j-2,i))
-			       //+ u_cr(CRE,k,je+j-1,i);
+
+          u_cr(CRE,k,je+j,i) = 3.0*beta*(presProfile(x1,x2)-presProfile(x1,pco->x2v(je))) + u_cr(CRE,k,je,i);
           u_cr(CRF2,k,je+j,i) = u_cr(CRF2,k,je,i); //u_cr(CRF1,k,j,is);
           u_cr(CRF1,k,je+j,i) = u_cr(CRF1,k,je,i);
-				//dx1/dx2*( u_cr(CRF2,k,je+j-1,i) - u_cr(CRF2,k,je+j-2,i))
-			       //+ u_cr(CRF2,k,je+j-1,i);
-          //u_cr(CRF2,k,je+j,i) = 0.0; //u_cr(CRF2,k,j,is);
           u_cr(CRF3,k,je+j,i) = u_cr(CRF3,k,je,i); //u_cr(CRF3,k,j,is);
         }
       }
