@@ -172,7 +172,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
 
   if(CR_ENABLED){
-   // pcr->EnrollOpacityFunction(Diffusion);
+   pcr->EnrollOpacityFunction(Diffusion);
    // pcr->EnrollUserCRSource(myCRSource);
   }
 
@@ -227,6 +227,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   g0 = pin->GetReal("problem","grav");
   pres0 = pin->GetReal("problem","Pres");
   H = pres0/dens0/(-1.0*g0)*(1+alpha+beta);
+  Real PPertAmp = 0.0; //pin->GetReal("problem","pertPresAmplitude");
 
   if(CR_ENABLED){
     crPertCenterX = pin->GetReal("problem","pertX");
@@ -236,6 +237,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     crPertStartTime = pin->GetReal("problem","pertStart");
     crPertEndTime = pin->GetReal("problem","pertEnd");
     crPertSteep = pin->GetReal("problem","pertDx");
+    PPertAmp = pin->GetReal("problem","pertPresAmplitude");
   } 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -259,10 +261,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
           
           pcr->u_cr(CRE,k,j,i) = 3.0*crp+myVal;// exp(-40.0*(dist_sq));
-          pcr->u_cr(CRF1,k,j,i) = 0.0;//vx*4.0*exp(-40.0*dist_sq)/(3.0*pcr->vmax) 
-                                 //+80*x1*exp(-40.0*dist_sq)/sigma;
-          pcr->u_cr(CRF2,k,j,i) = 0.0;
+          pcr->u_cr(CRF1,k,j,i) = 0.0;//cos(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0; 
+          pcr->u_cr(CRF2,k,j,i) = 0.0;//sin(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
+          //phydro->u(IEN,k,j,i) += pres0*PPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep))/(gamma-1) ;
         }
       }// end i
     }
