@@ -209,7 +209,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin){
       EnrollUserCRBoundaryFunction(outer_x1, ProfilesCROuterX1);
   //  EnrollUserTimeStepFunction(CRSourceTimeStep);
   }
-  //if (adaptive==true) EnrollUserRefinementCondition(RefinementCondition);
+  if (adaptive==true) EnrollUserRefinementCondition(RefinementCondition);
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
@@ -227,17 +227,17 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   g0 = pin->GetReal("problem","grav");
   pres0 = pin->GetReal("problem","Pres");
   H = pres0/dens0/(-1.0*g0)*(1+alpha+beta);
-  Real PPertAmp = 0.0; //pin->GetReal("problem","pertPresAmplitude");
+  //Real PPertAmp = 0.0; //pin->GetReal("problem","pertPresAmplitude");
 
   if(CR_ENABLED){
     crPertCenterX = pin->GetReal("problem","pertX");
     crPertCenterY = pin->GetReal("problem","pertY");
-    crPertRadius = pin->GetReal("problem","pertR");
+    //crPertRadius = pin->GetReal("problem","pertR");
     crPertAmp = pin->GetReal("problem","pertAmplitude");
-    crPertStartTime = pin->GetReal("problem","pertStart");
-    crPertEndTime = pin->GetReal("problem","pertEnd");
+    //crPertStartTime = pin->GetReal("problem","pertStart");
+    //crPertEndTime = pin->GetReal("problem","pertEnd");
     crPertSteep = pin->GetReal("problem","pertDx");
-    PPertAmp = pin->GetReal("problem","pertPresAmplitude");
+    //PPertAmp = pin->GetReal("problem","pertPresAmplitude");
   } 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -258,7 +258,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
           sigma = pin->GetReal("cr","sigma");
           Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-          Real myVal = 3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
+          Real myVal = 3.0*pres0*beta*crPertAmp/(crPertSteep*pow(2*M_PI,0.5))*exp(-0.5*pow(dist/crPertSteep,2.0));
+                       //3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
           
           pcr->u_cr(CRE,k,j,i) = 3.0*crp+myVal;// exp(-40.0*(dist_sq));
           pcr->u_cr(CRF1,k,j,i) = 0.0;//cos(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0; 
@@ -754,6 +755,7 @@ void myCRSource(MeshBlock *pmb, const Real time, const Real dt,
 
 int RefinementCondition(MeshBlock *pmb) {
   AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> &u_cr = pmb->pcr->u_cr;
   Real maxeps = 0.0;
   int k = pmb->ks;
   for (int j=pmb->js; j<=pmb->je; j++) {
@@ -764,7 +766,11 @@ int RefinementCondition(MeshBlock *pmb) {
       Real epsp = (std::abs(w(IPR,k,j,i+1) - 2.0*w(IPR,k,j,i) + w(IPR,k,j,i-1))
                   + std::abs(w(IPR,k,j+1,i) - 2.0*w(IPR,k,j,i) + w(IPR,k,j-1,i)))
                   /w(IPR,k,j,i);
+      Real epscr = (std::abs(u_cr(CRE,k,j,i+1) - 2.0*u_cr(CRE,k,j,i) + u_cr(CRE,k,j,i-1))
+                  + std::abs(u_cr(CRE,k,j+1,i) - 2.0*u_cr(CRE,k,j,i) + u_cr(CRE,k,j-1,i)))
+                  /u_cr(CRE,k,j,i);
       Real eps = std::max(epsr, epsp);
+      eps = std::max(eps, epscr);
       maxeps = std::max(maxeps, eps);
     }
   }
