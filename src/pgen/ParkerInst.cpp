@@ -227,7 +227,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   g0 = pin->GetReal("problem","grav");
   pres0 = pin->GetReal("problem","Pres");
   H = pres0/dens0/(-1.0*g0)*(1+alpha+beta);
-  //Real PPertAmp = 0.0; //pin->GetReal("problem","pertPresAmplitude");
+  Real PPertAmp = 0.0; //pin->GetReal("problem","pertPresAmplitude");
 
   if(CR_ENABLED){
     crPertCenterX = pin->GetReal("problem","pertX");
@@ -237,7 +237,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     //crPertStartTime = pin->GetReal("problem","pertStart");
     //crPertEndTime = pin->GetReal("problem","pertEnd");
     crPertSteep = pin->GetReal("problem","pertDx");
-    //PPertAmp = pin->GetReal("problem","pertPresAmplitude");
+    PPertAmp = pin->GetReal("problem","pertPresAmplitude");
   } 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -258,14 +258,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
           sigma = pin->GetReal("cr","sigma");
           Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-          Real myVal = 3.0*pres0*beta*crPertAmp/(crPertSteep*pow(2*M_PI,0.5))*exp(-0.5*pow(dist/crPertSteep,2.0));
+          Real myVal = pres0*crPertAmp/(crPertSteep*pow(2*M_PI,0.5))*exp(-0.5*pow(dist/crPertSteep,2.0));
                        //3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
           
-          pcr->u_cr(CRE,k,j,i) = 3.0*crp+myVal;// exp(-40.0*(dist_sq));
-          pcr->u_cr(CRF1,k,j,i) = 0.0;//cos(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0; 
+          pcr->u_cr(CRE,k,j,i) = 3.0*crp+3.0*beta*myVal;// exp(-40.0*(dist_sq));
+          pcr->u_cr(CRF1,k,j,i) = myVal*beta*(2.0*(x1-crPertCenterX)/pow(crPertSteep,2.0))/sigma; 
           pcr->u_cr(CRF2,k,j,i) = 0.0;//sin(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
-          //phydro->u(IEN,k,j,i) += pres0*PPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep))/(gamma-1) ;
+          phydro->u(IEN,k,j,i) += PPertAmp*myVal/(gamma-1) ;
         }
       }// end i
     }

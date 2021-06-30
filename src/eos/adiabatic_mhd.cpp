@@ -167,6 +167,7 @@ void EquationOfState::ApplyPrimitiveFloors(AthenaArray<Real> &prim, int k, int j
   // apply pressure floor
   w_p = (w_p > pressure_floor_) ?  w_p : pressure_floor_;
 
+
   return;
 }
 
@@ -200,6 +201,7 @@ void EquationOfState::ApplyPrimitiveConservedFloors(
         u_e : ((pressure_floor_/gm1) + pb + e_k);
   w_p = (w_p > pressure_floor_) ?
         w_p : pressure_floor_;
+
 
   return;
 }
