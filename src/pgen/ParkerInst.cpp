@@ -39,6 +39,7 @@
 #include "../coordinates/coordinates.hpp"
 #include "../cr/cr.hpp"
 #include "../cr/integrators/cr_integrators.hpp"
+#include "../scalars/scalars.hpp"
 
 
 //======================================================================================
@@ -59,7 +60,7 @@ Real H, nGrav;
 Real g0;
 Real alpha;
 Real beta;
-int cooling;
+int cooling, tracking;
 
 //Perturbation variables
 Real crPertCenterX;
@@ -231,6 +232,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   if(CR_ENABLED){
     crPertCenterX = pin->GetReal("problem","pertX");
     crPertCenterY = pin->GetReal("problem","pertY");
+    sigma = pin->GetReal("cr","sigma");
     //crPertRadius = pin->GetReal("problem","pertR");
     crPertAmp = pin->GetReal("problem","pertAmplitude");
     //crPertStartTime = pin->GetReal("problem","pertStart");
@@ -255,16 +257,22 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IEN,k,j,i) = pressure/(gamma-1) + 0.5*density*pow(vx,2.0);
         if(CR_ENABLED){
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
-          sigma = pin->GetReal("cr","sigma");
           Real dist = pow(pow(x1-crPertCenterX,2.0)+pow(x2-crPertCenterY,2.0),0.5);
-          Real myVal = pres0*crPertAmp/(crPertSteep*pow(2*M_PI,0.5))*exp(-0.5*pow(dist/crPertSteep,2.0));
+          Real myVal = 1/(crPertSteep*pow(2*M_PI,0.5))*exp(-0.5*pow(dist/crPertSteep,2.0));
                        //3.0*pres0*beta*crPertAmp*0.5*(1 - tanh((dist-crPertRadius)/crPertSteep));
 
-          pcr->u_cr(CRE,k,j,i) = 3.0*crp+3.0*beta*myVal;// exp(-40.0*(dist_sq));
-          pcr->u_cr(CRF1,k,j,i) = myVal*beta*(2.0*(x1-crPertCenterX)/pow(crPertSteep,2.0))/sigma + vx*4.0*crp;
-          pcr->u_cr(CRF2,k,j,i) = 0.0;//sin(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0;
+          pcr->u_cr(CRE,k,j,i) = 3.0*crp+3.0*beta*myVal*pres0*crPertAmp;// exp(-40.0*(dist_sq));
+          pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;//myVal*pres0*crPertAmp*beta*
+                                  //(2.0*(x1-crPertCenterX)/pow(crPertSteep,2.0))
+                                  // /sigma + ;
+          pcr->u_cr(CRF2,k,j,i) = 3.0*crp/(sigma*H)*tanh(x2/(nGrav*H));//sin(atan2(x2,x1))*pcr->u_cr(CRE,k,j,i)*4.0/3.0;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
           phydro->u(IEN,k,j,i) += PPertAmp*myVal/(gamma-1) ;
+          if ((NSCALARS > 0) && (myVal != 0.0)) {
+           for (int n=0; n<NSCALARS; ++n) {
+             pscalars->s(n,k,j,i) = myVal;
+           }
+          }
         }
       }// end i
     }
@@ -691,7 +699,7 @@ void ProjectCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
 
           u_cr(CRE,k,js-j,i) = 3.0*beta*(presProfile(x1,x2)-presProfile(x1,pco->x2v(js))) + u_cr(CRE,k,js,i);
           u_cr(CRF1,k,js-j,i) = vx*4.0*beta*presProfile(x1,pco->x2v(js)) + u_cr(CRF1,k,js,i); //u_cr(CRF1,k,j,is);
-          u_cr(CRF2,k,js-j,i) = u_cr(CRF2,k,js,i);
+          u_cr(CRF2,k,js-j,i) = 3.0*beta*presProfile(x1,x2)/(sigma*H)*tanh(x2/(nGrav*H));
           u_cr(CRF3,k,js-j,i) = u_cr(CRF3,k,js,i); //u_cr(CRF3,k,j,is);
 
         }
@@ -714,7 +722,7 @@ void ProjectCROuterX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
 
           u_cr(CRE,k,je+j,i) = 3.0*beta*(presProfile(x1,x2)-presProfile(x1,pco->x2v(je))) + u_cr(CRE,k,je,i);
           u_cr(CRF2,k,je+j,i) = vx*4.0*beta*presProfile(x1,pco->x2v(je)) + u_cr(CRF2,k,je,i); //u_cr(CRF1,k,j,is);
-          u_cr(CRF1,k,je+j,i) = u_cr(CRF1,k,je,i);
+          u_cr(CRF1,k,je+j,i) = 3.0*beta*presProfile(x1,x2)/(sigma*H)*tanh(x2/(nGrav*H));
           u_cr(CRF3,k,je+j,i) = u_cr(CRF3,k,je,i); //u_cr(CRF3,k,j,is);
         }
       }
@@ -768,8 +776,6 @@ void myCRSource(MeshBlock *pmb, const Real time, const Real dt,
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc)
 {
-
-
   // set the default opacity to be a large value in the default hydro case
   CosmicRay *pcr=pmb->pcr;
   int kl=pmb->ks, ku=pmb->ke;
