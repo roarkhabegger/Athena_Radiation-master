@@ -623,7 +623,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
         Real dx = pco->x2v(ju-1) - pco->x2v(ju);
         Real delta = pco->x2v(ju+j) - pco->x2v(ju);
         Real dy = prim(IDN,k,ju-1,i) - prim(IDN,k,ju,i);
-        Real myVal = dy/dx*delta + prim(IDN,k,ju,jl);
+        Real myVal = dy/dx*delta + prim(IDN,k,ju,i);
         if (myVal < dfloor) {
           prim(IDN,k,ju+j,i) = dfloor;
         } else {
@@ -637,7 +637,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
 
         //Diff = prim(IPR,k,ju-j+1,i) - presProfile(x1,pco->x2v(ju-j+1));
         dy = prim(IPR,k,ju-1,i) - prim(IPR,k,ju,i);
-        myVal = dy/dx*delta + prim(IPR,k,ju,jl);
+        myVal = dy/dx*delta + prim(IPR,k,ju,i);
         if (myVal < pfloor) {
           prim(IPR,k,ju+j,i) = pfloor;
         } else {
@@ -667,7 +667,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
             myVal = 0.0;
           }
           //Real Diff = b.x1f(k,ju+1-j,i) - B0*sqrt(presProfile(x1,pco->x1v(ju+1-j)));
-          b.x1f(k,(ju+j),i) =  myVal;//- Diff;
+          b.x1f(k,(ju+j),i) =  myVal; //- Diff;
         }
       }
     }
