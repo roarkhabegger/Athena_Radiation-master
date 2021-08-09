@@ -588,7 +588,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          b.x2f(k,(jl-j),i) = 0.0;//b.x2f(k,jl-1+j,i);// std::pow(alpha*pressure,0.5);  // reflect 2-field
+          b.x2f(k,(jl-j),i) = b.x2f(k,jl,i);// std::pow(alpha*pressure,0.5);  // reflect 2-field
         }
       }
     }
@@ -676,7 +676,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
       for (int j=2; j<=ngh+1; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          b.x2f(k,(ju+j),i) = 0.0;//b.x2f(k,ju+1-j,i) ;// std::pow(alpha*pressure,0.5);  // reflect 2-field
+          b.x2f(k,(ju+j),i) = b.x2f(k,ju+1,i) ;// std::pow(alpha*pressure,0.5);  // reflect 2-field
         }
       }
     }
