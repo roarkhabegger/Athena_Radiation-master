@@ -543,11 +543,11 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
         if (myVal < dfloor) {
           prim(IDN,k,jl-j,i) = dfloor;
         } else {
-          prim(IDN,k,jl-j,i) = myVal;
+          prim(IDN,k,jl-j,i) = dfloor;
         }
 
         prim(IVX,k,jl-j,i) = 0.0;//vx- Diff;
-        prim(IVY,k,jl-j,i) = prim(IVY,k,jl,i);//prim(IVY,k,jl-1+j,i);
+        prim(IVY,k,jl-j,i) = 0.0;//prim(IVY,k,jl,i);//prim(IVY,k,jl-1+j,i);
         prim(IVZ,k,jl-j,i) = 0.0;//prim(IVZ,k,jl-1+j,i);
 
         dy = prim(IPR,k,jl+1,i) - prim(IPR,k,jl,i); //prim(IPR,k,jl-1+j,i) - presProfile(x1,pco->x2v(jl-1+j));
@@ -555,7 +555,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
         if (myVal < pfloor) {
           prim(IPR,k,jl-j,i) = pfloor;
         } else {
-          prim(IPR,k,jl-j,i) = myVal;
+          prim(IPR,k,jl-j,i) = pfloor;
         }
       }
     }
@@ -579,7 +579,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
             myVal = 0.0;
           }
           //Real Diff = b.x1f(k,jl-1+j,i) - B0*sqrt(presProfile(x1,pco->x1v(jl-1+j)));
-          b.x1f(k,(jl-j),i) =  myVal;// - Diff;
+          b.x1f(k,(jl-j),i) =  0.0; //myVal;// - Diff;
         }
       }
     }
@@ -588,7 +588,7 @@ void ProjectPressureInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
       for (int j=1; j<=ngh; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          b.x2f(k,(jl-j),i) = b.x2f(k,jl,i);// std::pow(alpha*pressure,0.5);  // reflect 2-field
+          b.x2f(k,(jl-j),i) = 0.0;//b.x2f(k,jl,i);// std::pow(alpha*pressure,0.5);  // reflect 2-field
         }
       }
     }
@@ -627,12 +627,12 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
         if (myVal < dfloor) {
           prim(IDN,k,ju+j,i) = dfloor;
         } else {
-          prim(IDN,k,ju+j,i) = myVal;
+          prim(IDN,k,ju+j,i) = dfloor;
         }
 
         //Diff = prim(IVX,k,ju-j+1,i) - vx;
         prim(IVX,k,ju+j,i) = 0.0;//vx - Diff;
-        prim(IVY,k,ju+j,i) = prim(IVY,k,ju,i);//prim(IVY,k,ju-j+1,i);  // reflect 2-velocity
+        prim(IVY,k,ju+j,i) = 0.0; //prim(IVY,k,ju,i);//prim(IVY,k,ju-j+1,i);  // reflect 2-velocity
         prim(IVZ,k,ju+j,i) = 0.0;//prim(IVZ,k,ju-j+1,i);
 
         //Diff = prim(IPR,k,ju-j+1,i) - presProfile(x1,pco->x2v(ju-j+1));
@@ -641,7 +641,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
         if (myVal < pfloor) {
           prim(IPR,k,ju+j,i) = pfloor;
         } else {
-          prim(IPR,k,ju+j,i) = myVal;
+          prim(IPR,k,ju+j,i) = pfloor;
         }
 
       }
@@ -667,7 +667,7 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
             myVal = 0.0;
           }
           //Real Diff = b.x1f(k,ju+1-j,i) - B0*sqrt(presProfile(x1,pco->x1v(ju+1-j)));
-          b.x1f(k,(ju+j),i) =  myVal; //- Diff;
+          b.x1f(k,(ju+j),i) =  0.0; //- Diff;
         }
       }
     }
@@ -676,7 +676,14 @@ void ProjectPressureOuterX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> 
       for (int j=2; j<=ngh+1; ++j) {
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
-          b.x2f(k,(ju+j),i) = b.x2f(k,ju+1,i) ;// std::pow(alpha*pressure,0.5);  // reflect 2-field
+          Real dx = pco->x2f(ju) - pco->x2f(ju+1);
+          Real delta = pco->x2f(ju+j) - pco->x2f(ju+1);
+          Real dy = b.x2f(k,ju,i) - b.x2f(k,ju+1,i);
+          Real myVal = dy/dx*delta + b.x2f(k,ju+1,i);
+          if (myVal*b.x2f(k,ju+1,i) <= 0) {
+            myVal = 0.0;
+          }
+          b.x2f(k,(ju+j),i) = 0.0;// std::pow(alpha*pressure,0.5);  // reflect 2-field
         }
       }
     }
