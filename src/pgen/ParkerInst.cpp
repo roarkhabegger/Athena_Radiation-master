@@ -77,7 +77,9 @@ int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
 
 
 //Perturbation variables
-Real crPertCenterZ; // pert is at X=0, Y=0 this determines height from disk
+Real crPertCenterX;
+Real crPertCenterY;
+Real crPertCenterZ; // this determines height from disk
 Real crD; // percentage of SN energy in CRs - in multiples of 10%
 Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
@@ -145,7 +147,7 @@ Real gravProfile(Real x1, Real x2, Real x3)
 
 Real pertProfile(Real x1, Real x2, Real x3)
 {
-  Real dist = pow(SQR(x1)+SQR(x2-crPertCenterZ)+SQR(x3),0.5);
+  Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
   Real p = pow(crPertRad,-3.0)*exp(-32.82*SQR(dist/crPertRad)*SQR(H));
   return p;
 }
@@ -219,6 +221,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   if(CR_ENABLED){
     //Load CR Variables
+    crPertCenterX = pin->GetReal("problem","pertX");
+    crPertCenterY = pin->GetReal("problem","pertY");
     crPertCenterZ = pin->GetReal("problem","pertZ");
     sigma = pin->GetReal("cr","sigma");
     crEsn= pin->GetReal("problem","snEner");
