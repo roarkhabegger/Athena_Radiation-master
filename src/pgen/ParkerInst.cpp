@@ -139,7 +139,7 @@ Real presProfile(Real x1, Real x2, Real x3)
 
 Real gravProfile(Real x1, Real x2, Real x3)
 {
-  Real g = tanh(x2/(nGrav));//*g0;
+  Real g = -1*tanh(x2/(nGrav));//*g0;
   return g;
 }
 
