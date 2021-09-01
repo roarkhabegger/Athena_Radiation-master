@@ -215,7 +215,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
   // Derived variables
-  H = pres0/dens0/(-1.0*g0)*(1+alpha+beta);
+  H = pres0/dens0/(g0)*(1+alpha+beta);
 
   if(CR_ENABLED){
     //Load CR Variables
