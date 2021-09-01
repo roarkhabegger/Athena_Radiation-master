@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --partition=univ2 
+#SBATCH --partition=univ2,astro3 
 #SBATCH --time=0-04:00:00 #runtime in days-hh:mm:ss
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8 #cpus per node
