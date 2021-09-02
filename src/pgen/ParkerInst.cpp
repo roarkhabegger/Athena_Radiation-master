@@ -53,16 +53,13 @@
 //     Length scale is H = P_0/(rho_0 g_0) (1+ alpha + beta)
 //
 //Hydrostatic Equilibrium variables
-Real dens0, pres0, vx; // Initial hydro quantities
+Real dens0, pres0, g0, vx; // Initial hydro quantities
                        // dens0 in multiples of 1e-24 g/cm^3
                        // pres0 in multiples of 1e-12 erg/cm^3
+                       // g0 = (1+alpha + beta)*pres0/dens0
                        // vx in multiples of 1e6 cm/s
-Real H, nGrav; // H is scalar multiple change from
-               // H_0 = Sqr(1e6 cm/s) / (4 * 1e-9 cm/s^2)
-               //     = 0.25e21 cm = 81.019482 pc
-               // nGrav is scale height of stars divided by scale height of gas
+Real nGrav;    // nGrav is scale height of stars divided by scale height of gas
                //      approx 1 in Milky Way
-Real g0;       // in multiples of 4e-9 cm/s^2
 Real alpha;    // Ratio of magnetic pressure to gas pressure
 Real beta;     // Ratio of cosmic ray pressure to gas pressure
 
@@ -129,26 +126,26 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 //Implement functions
 Real densProfile(Real x1, Real x2, Real x3)
 {
-  Real rho = pow(cosh(x2/(nGrav)),-1.0*nGrav);
+  Real rho = dens0*pow(cosh(x2/(nGrav)),-1.0*nGrav);
   return rho;
 }
 
 Real presProfile(Real x1, Real x2, Real x3)
 {
-  Real pres = densProfile(x1,x2,x3);
+  Real pres = pres0/dens0*densProfile(x1,x2,x3);
   return pres;
 }
 
 Real gravProfile(Real x1, Real x2, Real x3)
 {
-  Real g = -1*tanh(x2/(nGrav));//*g0;
+  Real g = -1*g0*tanh(x2/(nGrav));//*g0;
   return g;
 }
 
 Real pertProfile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
-  Real p = pow(crPertRad,-3.0)*exp(-32.82*SQR(dist/crPertRad)*SQR(H));
+  Real p = pow(crPertRad,-3.0)*exp(-32.82*SQR(dist/crPertRad));
   return p;
 }
 
@@ -207,17 +204,19 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   nGrav = pin->GetReal("problem","GravNumScaleHeight");
   beta = pin->GetOrAddReal("problem","beta",0.0);
   alpha = pin->GetOrAddReal("problem","alpha",0.0);
+  pres0 = pin->GetReal("problem","Pres");
 
   dens0 = pin->GetReal("problem","Dens");
-  g0 = pin->GetReal("problem","grav");
-  pres0 = pin->GetReal("problem","Pres");
+
+  g0 = (1+alpha+beta)*pres0/dens0;//pin->GetReal("problem","grav");
+
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
 
 
   // Derived variables
-  H = pres0/dens0/(g0)*(1+alpha+beta);
+  //H = pres0/(dens0*g0)*(1+alpha+beta); H ==1 always if length scale is H
 
   if(CR_ENABLED){
     //Load CR Variables
