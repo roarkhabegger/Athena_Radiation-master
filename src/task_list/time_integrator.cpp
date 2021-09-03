@@ -251,14 +251,14 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm) {
       } else { // Hydro
         AddTask(CALC_HYDFLX,DIFFUSE_HYD);
       }
-      // if (NSCALARS > 0) {
-      //   AddTask(DIFFUSE_SCLR,NONE);
-      //   AddTask(CALC_SCLRFLX,(CALC_HYDFLX|DIFFUSE_SCLR));
-      // }
+      if (NSCALARS > 0) {
+        AddTask(DIFFUSE_SCLR,NONE);
+        AddTask(CALC_SCLRFLX,(CALC_HYDFLX|DIFFUSE_SCLR));
+      }
     } else { // STS enabled:
       AddTask(CALC_HYDFLX,NONE);
-      // if (NSCALARS > 0)
-      //   AddTask(CALC_SCLRFLX,CALC_HYDFLX);
+      if (NSCALARS > 0)
+        AddTask(CALC_SCLRFLX,CALC_HYDFLX);
     }
     if (pm->multilevel) { // SMR or AMR
       AddTask(SEND_HYDFLX,CALC_HYDFLX);
@@ -306,16 +306,6 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm) {
       src_term = (src_term | SRCTERM_RAD);
     if(CR_ENABLED+TC_ENABLED)
       src_term = (src_term | SRCTERM_CRTC);
-
-    if (NSCALARS > 0) {
-      if (!STS_ENABLED) {
-        AddTask(DIFFUSE_SCLR,NONE);
-        AddTask(CALC_SCLRFLX,(src_term|DIFFUSE_SCLR));
-      } else { // STS enabled:
-        AddTask(CALC_SCLRFLX,src_term);
-      }
-      src_term = (src_term | CALC_SCLRFLX);
-    }
 
     AddTask(SEND_HYD,src_term);
     AddTask(RECV_HYD,NONE);

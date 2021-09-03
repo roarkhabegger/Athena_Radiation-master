@@ -82,11 +82,22 @@ Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
                 // in units of 10pc
 
+
+Real s1Y;
+Real s1Z;
+Real s1R;
+
+Real s2Y;
+Real s2Z;
+Real s2R;
+
 //Profile functions
 Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
 Real gravProfile(Real x1, Real x2, Real x3);
 Real pertProfile(Real x1, Real x2, Real x3);
+Real s1Profile(Real x1, Real x2, Real x3);
+Real s2Profile(Real x1, Real x2, Real x3);
 
 //For logarithmic height spacing
 Real LogMeshSpacingX2(Real x, RegionSize rs);
@@ -146,6 +157,20 @@ Real pertProfile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
   Real p = pow(crPertRad,-3.0)*exp(-32.82*SQR(dist/crPertRad));
+  return p;
+}
+
+Real s1Profile(Real x1, Real x2, Real x3)
+{
+  Real dist = pow(SQR(x2-s1Z)+SQR(x3-s1Y),0.5);
+  Real p = pow(s1R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s1R));
+  return p;
+}
+
+Real s2Profile(Real x1, Real x2, Real x3)
+{
+  Real dist = pow(SQR(x2-s2Z)+SQR(x3-s2Y),0.5);
+  Real p = pow(s2R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s2R));
   return p;
 }
 
@@ -228,6 +253,15 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     crD= pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
   }
+  // Setup scalar tracker for perturbation
+  if ((NSCALARS > 0) ) {
+    s1Y = pin->GetOrAddReal("problem","scalar1Y",0.0);
+    s1Z = pin->GetOrAddReal("problem","scalar1Z",0.0);
+    s1R = pin->GetOrAddReal("problem","scalar1R",1.0);
+    s2Y = pin->GetOrAddReal("problem","scalar2Y",0.0);
+    s2Z = pin->GetOrAddReal("problem","scalar2Z",0.0);
+    s2R = pin->GetOrAddReal("problem","scalar2R",1.0);
+  }
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -258,11 +292,11 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           pcr->u_cr(CRF2,k,j,i) = -1.0*dPcdz/sigma;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
 
-          // Setup scalar tracker for perturbation
-          if ((NSCALARS > 0) ) {
-            pscalars->s(0,k,j,i) = pertVal;
-            pscalars->s(1,k,j,i) = pertValNoX;
-          }
+        }
+        // Setup scalar tracker for flux tubes
+        if ((NSCALARS > 0) ) {
+          pscalars->s(0,k,j,i) = s1Profile(x1,x2,x3);
+          pscalars->s(1,k,j,i) = s2Profile(x1,x2,x3);
         }
       }// end i
     }
