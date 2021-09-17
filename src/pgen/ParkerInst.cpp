@@ -53,7 +53,7 @@
 //     Length scale is H = P_0/(rho_0 g_0) (1+ alpha + beta)
 //
 //Hydrostatic Equilibrium variables
-Real dens0, pres0, g0, vx; // Initial hydro quantities
+Real dens0, pres0, g0, vx, myGamma; // Initial hydro quantities
                        // dens0 in multiples of 1e-24 g/cm^3
                        // pres0 in multiples of 1e-12 erg/cm^3
                        // g0 = (1+alpha + beta)*pres0/dens0
@@ -62,6 +62,8 @@ Real nGrav;    // nGrav is scale height of stars divided by scale height of gas
                //      approx 1 in Milky Way
 Real alpha;    // Ratio of magnetic pressure to gas pressure
 Real beta;     // Ratio of cosmic ray pressure to gas pressure
+
+Real H;
 
 //Floors for Diode boundary conds
 Real dfloor, pfloor; // Floor values for density and rpessure
@@ -143,7 +145,7 @@ Real densProfile(Real x1, Real x2, Real x3)
 
 Real presProfile(Real x1, Real x2, Real x3)
 {
-  Real pres = pres0/dens0*densProfile(x1,x2,x3);
+  Real pres = pres0*myGamma/dens0*densProfile(x1,x2,x3);
   return pres;
 }
 
@@ -156,21 +158,24 @@ Real gravProfile(Real x1, Real x2, Real x3)
 Real pertProfile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
-  Real p = pow(crPertRad,-3.0)*exp(-32.82*SQR(dist/crPertRad));
+  Real p = pow(crPertRad,-3.0)*exp(-32.81*SQR(dist/crPertRad));
   return p;
+  //Coefficient is H0^2/200 pc^2
 }
 
 Real s1Profile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x2-s1Z)+SQR(x3-s1Y),0.5);
-  Real p = pow(s1R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s1R));
+  Real p = 0.5*(1 - tanh((dist - s1R)/0.000001));
+  //Real p = pow(s1R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s1R));
   return p;
 }
 
 Real s2Profile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x2-s2Z)+SQR(x3-s2Y),0.5);
-  Real p = pow(s2R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s2R));
+  Real p = 0.5*(1 - tanh((dist - s2R)/0.000001));
+  // Real p = pow(s2R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s2R));
   return p;
 }
 
@@ -222,7 +227,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
 
-  Real gamma = peos->GetGamma();
+  myGamma = peos->GetGamma();
 
   // Load variables
   vx=pin->GetReal("problem","xVel");
@@ -233,7 +238,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   dens0 = pin->GetReal("problem","Dens");
 
-  g0 = (1+alpha+beta)*pres0/dens0;//pin->GetReal("problem","grav");
+  g0 = (1+alpha+beta)*pres0/dens0*myGamma;//pin->GetReal("problem","grav");
 
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
@@ -241,7 +246,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
 
   // Derived variables
-  //H = pres0/(dens0*g0)*(1+alpha+beta); H ==1 always if length scale is H
+  //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
 
   if(CR_ENABLED){
     //Load CR Variables
@@ -277,7 +282,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM1,k,j,i) = vx*density;
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
-        phydro->u(IEN,k,j,i) = pressure/(gamma-1) + 0.5*density*SQR(vx);
+        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx);
 
         if(CR_ENABLED){
           // get CR parameters
@@ -288,6 +293,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
           // set CR variables
           pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn * 216.1118 / pres0;
+          //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = -1.0*dPcdz/sigma;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
