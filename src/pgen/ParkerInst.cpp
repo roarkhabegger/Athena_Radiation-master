@@ -131,7 +131,8 @@ void DiodeCRInnerX2(MeshBlock *pmb, Coordinates *pco, CosmicRay *pcr,
     int js, int je, int ks, int ke, int ngh);
 
 //cr Diffusion variables and function
-Real sigma;
+Real sigmaParl, sigmaPerp;
+
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 
@@ -253,7 +254,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     crPertCenterX = pin->GetReal("problem","pertX");
     crPertCenterY = pin->GetReal("problem","pertY");
     crPertCenterZ = pin->GetReal("problem","pertZ");
-    sigma = pin->GetReal("cr","sigma");
+    sigmaPerp = pin->GetReal("cr","sigmaPerp");
+    sigmaParl = pin->GetReal("cr","sigmaParl");
     crEsn= pin->GetReal("problem","snEner");
     crD= pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
@@ -295,7 +297,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn * 216.1118 / pres0;
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
-          pcr->u_cr(CRF2,k,j,i) = -1.0*dPcdz/sigma;
+          pcr->u_cr(CRF2,k,j,i) = -1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
 
         }
@@ -366,9 +368,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     for(int k=0; k<nz3; ++k){
       for(int j=0; j<nz2; ++j){
         for(int i=0; i<nz1; ++i){
-          pcr->sigma_diff(0,k,j,i) = sigma;
-          pcr->sigma_diff(1,k,j,i) = sigma;
-          pcr->sigma_diff(2,k,j,i) = sigma;
+          pcr->sigma_diff(0,k,j,i) = sigmaParl;
+          pcr->sigma_diff(1,k,j,i) = sigmaPerp;
+          pcr->sigma_diff(2,k,j,i) = sigmaPerp;
         }
       }
     }// end k,j,i
@@ -588,9 +590,9 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 #pragma omp simd
       for(int i=il; i<=iu; ++i){
 
-        pcr->sigma_diff(0,k,j,i) = sigma;
-        pcr->sigma_diff(1,k,j,i) = sigma;
-        pcr->sigma_diff(2,k,j,i) = sigma;
+        pcr->sigma_diff(0,k,j,i) = sigmaParl;
+        pcr->sigma_diff(1,k,j,i) = sigmaPerp;
+        pcr->sigma_diff(2,k,j,i) = sigmaPerp;
 
       }
     }
