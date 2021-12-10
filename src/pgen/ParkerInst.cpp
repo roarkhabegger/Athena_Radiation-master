@@ -140,7 +140,7 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 //Implement functions
 Real densProfile(Real x1, Real x2, Real x3)
 {
-  Real rho = dens0*pow(cosh(x2/(nGrav)),-1.0*nGrav);
+  Real rho = dens0*pow(cosh(x2/(nGrav*H)),-1.0*nGrav);
   return rho;
 }
 
@@ -152,14 +152,14 @@ Real presProfile(Real x1, Real x2, Real x3)
 
 Real gravProfile(Real x1, Real x2, Real x3)
 {
-  Real g = -1*g0*tanh(x2/(nGrav));//*g0;
+  Real g = -1*g0*tanh(x2/(nGrav*H));//*g0;
   return g;
 }
 
 Real pertProfile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
-  Real p = pow(crPertRad,-3.0)*exp(-32.81*SQR(dist/crPertRad));
+  Real p = pow(crPertRad,-3.0)*exp(-50.0*SQR(dist/crPertRad));
   return p;
   //Coefficient is H0^2/200 pc^2
 }
@@ -239,7 +239,9 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   dens0 = pin->GetReal("problem","Dens");
 
-  g0 = (1+alpha+beta)*pres0/dens0*myGamma;//pin->GetReal("problem","grav");
+  g0 =pin->GetReal("problem","Grav");
+  H  =pin->GetReal("problem","ScaleH");
+  //Force initial hydrostatic equilibrium in x2 direction
 
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
