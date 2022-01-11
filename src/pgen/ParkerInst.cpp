@@ -199,6 +199,44 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 //Set up initial MESH data
 void Mesh::InitUserMeshData(ParameterInput *pin)
 {
+  myGamma = peos->GetGamma();
+
+  // Load variables
+  vx=pin->GetReal("problem","xVel");
+  nGrav = pin->GetReal("problem","GravNumScaleHeight");
+  beta = pin->GetOrAddReal("problem","beta",0.0);
+  alpha = pin->GetOrAddReal("problem","alpha",0.0);
+  pres0 = pin->GetReal("problem","Pres");
+
+  dens0 = pin->GetReal("problem","Dens");
+
+  g0 =pin->GetReal("problem","Grav");
+  H  =pin->GetReal("problem","ScaleH");
+
+  dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
+  pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
+
+  if(CR_ENABLED){
+    //Load CR Variables
+    crPertCenterX = pin->GetReal("problem","pertX");
+    crPertCenterY = pin->GetReal("problem","pertY");
+    crPertCenterZ = pin->GetReal("problem","pertZ");
+    sigmaPerp = pin->GetReal("cr","sigmaPerp");
+    sigmaParl = pin->GetReal("cr","sigmaParl");
+    crEsn= pin->GetReal("problem","snEner");
+    crD= pin->GetReal("problem","snEnerFrac");
+    crPertRad = pin->GetReal("problem","pertR");
+  }
+  // Setup scalar tracker for perturbation
+  if ((NSCALARS > 0) ) {
+    s1Y = pin->GetOrAddReal("problem","scalar1Y",0.0);
+    s1Z = pin->GetOrAddReal("problem","scalar1Z",0.0);
+    s1R = pin->GetOrAddReal("problem","scalar1R",1.0);
+    s2Y = pin->GetOrAddReal("problem","scalar2Y",0.0);
+    s2Z = pin->GetOrAddReal("problem","scalar2Z",0.0);
+    s2R = pin->GetOrAddReal("problem","scalar2R",1.0);
+  }
+
   Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
   if (x2rat< 0.0) {
     EnrollUserMeshGenerator(X2DIR,LogMeshSpacingX2);
@@ -228,49 +266,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
 
-  myGamma = peos->GetGamma();
-
-  // Load variables
-  vx=pin->GetReal("problem","xVel");
-  nGrav = pin->GetReal("problem","GravNumScaleHeight");
-  beta = pin->GetOrAddReal("problem","beta",0.0);
-  alpha = pin->GetOrAddReal("problem","alpha",0.0);
-  pres0 = pin->GetReal("problem","Pres");
-
-  dens0 = pin->GetReal("problem","Dens");
-
-  g0 =pin->GetReal("problem","Grav");
-  H  =pin->GetReal("problem","ScaleH");
-  //Force initial hydrostatic equilibrium in x2 direction
-
-
-  dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
-  pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
-
-
   // Derived variables
   //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
 
-  if(CR_ENABLED){
-    //Load CR Variables
-    crPertCenterX = pin->GetReal("problem","pertX");
-    crPertCenterY = pin->GetReal("problem","pertY");
-    crPertCenterZ = pin->GetReal("problem","pertZ");
-    sigmaPerp = pin->GetReal("cr","sigmaPerp");
-    sigmaParl = pin->GetReal("cr","sigmaParl");
-    crEsn= pin->GetReal("problem","snEner");
-    crD= pin->GetReal("problem","snEnerFrac");
-    crPertRad = pin->GetReal("problem","pertR");
-  }
-  // Setup scalar tracker for perturbation
-  if ((NSCALARS > 0) ) {
-    s1Y = pin->GetOrAddReal("problem","scalar1Y",0.0);
-    s1Z = pin->GetOrAddReal("problem","scalar1Z",0.0);
-    s1R = pin->GetOrAddReal("problem","scalar1R",1.0);
-    s2Y = pin->GetOrAddReal("problem","scalar2Y",0.0);
-    s2Z = pin->GetOrAddReal("problem","scalar2Z",0.0);
-    s2R = pin->GetOrAddReal("problem","scalar2R",1.0);
-  }
+
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
