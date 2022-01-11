@@ -199,7 +199,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 //Set up initial MESH data
 void Mesh::InitUserMeshData(ParameterInput *pin)
 {
-  myGamma = peos->GetGamma();
+  myGamma = pin->GetReal("hydro","gamma");
 
   // Load variables
   vx=pin->GetReal("problem","xVel");
