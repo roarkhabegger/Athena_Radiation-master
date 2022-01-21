@@ -88,10 +88,12 @@ Real crPertRad; // radius of supernova expansion (width of gaussian profile)
 Real s1Y;
 Real s1Z;
 Real s1R;
+Real s1dR;
 
 Real s2Y;
 Real s2Z;
 Real s2R;
+Real s2dR;
 
 //Profile functions
 Real densProfile(Real x1, Real x2, Real x3);
@@ -167,7 +169,7 @@ Real pertProfile(Real x1, Real x2, Real x3)
 Real s1Profile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x2-s1Z)+SQR(x3-s1Y),0.5);
-  Real p = 0.5*(1 - tanh((dist - s1R)/0.000001));
+  Real p = 0.5*(1 - tanh((dist - s1R)/s1dR));
   //Real p = pow(s1R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s1R));
   return p;
 }
@@ -175,7 +177,7 @@ Real s1Profile(Real x1, Real x2, Real x3)
 Real s2Profile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x2-s2Z)+SQR(x3-s2Y),0.5);
-  Real p = 0.5*(1 - tanh((dist - s2R)/0.000001));
+  Real p = 0.5*(1 - tanh((dist - s2R)/s2dR));
   // Real p = pow(s2R,-3.0)*pow(2*M_PI,1.5)*exp(-0.5*SQR(dist/s2R));
   return p;
 }
@@ -232,9 +234,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     s1Y = pin->GetOrAddReal("problem","scalar1Y",0.0);
     s1Z = pin->GetOrAddReal("problem","scalar1Z",0.0);
     s1R = pin->GetOrAddReal("problem","scalar1R",1.0);
+    s1dR = pin->GetOrAddReal("problem","scalar1dR",0.000001);
     s2Y = pin->GetOrAddReal("problem","scalar2Y",0.0);
     s2Z = pin->GetOrAddReal("problem","scalar2Z",0.0);
     s2R = pin->GetOrAddReal("problem","scalar2R",1.0);
+    s2dR = pin->GetOrAddReal("problem","scalar2dR",0.000001);
   }
 
   Real x2rat = pin->GetOrAddReal("mesh","x2rat",0.0);
