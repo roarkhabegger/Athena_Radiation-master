@@ -161,7 +161,7 @@ Real gravProfile(Real x1, Real x2, Real x3)
 Real pertProfile(Real x1, Real x2, Real x3)
 {
   Real dist = pow(SQR(x1-crPertCenterX)+SQR(x2-crPertCenterZ)+SQR(x3-crPertCenterY),0.5);
-  Real p = exp(-50.0*SQR(dist/crPertRad));
+  Real p = exp(-50.0*SQR(dist/crPertRad)) / pow(2*M_PI*SQR(crPertRad),1.5) * 1000;
   return p;
   //Coefficient is (100pc)^2/200 pc^2
 }
@@ -299,7 +299,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real dPcdz = -1.0*beta*presProfile(x1,x2,x3)*tanh(x2/(nGrav));
 
           // set CR variables
-          pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn ;
+          pcr->u_cr(CRE,k,j,i) = 3.0*(crp+pertVal * crD * crEsn);
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;
