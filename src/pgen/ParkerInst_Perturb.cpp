@@ -84,6 +84,8 @@ Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
                 // in units of 10pc
 
+//Random yvel perturbation variable
+Real randAmplitude;
 
 Real s1Y;
 Real s1Z;
@@ -214,6 +216,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   g0 =pin->GetReal("problem","Grav");
   H  =pin->GetReal("problem","ScaleH");
+  randAmplitude = pin->GetReal("problem", "randAmplitude");
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
@@ -273,6 +276,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   // Derived variables
   //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
 
+  //setup perturbation parameters before loop
+  Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
+  Real numWavelengths = floor(pin->GetReal("mesh", "nx1")/5);
+  Real xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
+  Real yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
+  srand(10); //arbitrary seed
+  //std::cout<< "\nnumWavelengths=" << numWavelengths;
 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -291,21 +301,22 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM3,k,j,i) = 0.0;
         phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx);
 
-        //set perturbations in z (vertical) velocities
-        Real A = pow(10.0, -4.0);
-        Real dv = 0;
-        for (int x=1; x<10; x++){
-          for (int z=1; z<10; z++){
-            Real thetaX = (rand() * M_PI) / RAND_MAX;
-            Real thetaZ = (rand() * M_PI) / RAND_MAX; //diff seeds?
-            Real Lx = (pcoord->x1v(ie) - pcoord->x1v(is)) / x;
-            Real Lz = (pcoord->x3v(ke) - pcoord->x3v(ks)) / z;
-            dv += A * sin((2*M_PI*x1) * Lx - thetaX) * sin((2*M_PI*x3) * Lz - thetaZ);
+        if(randAmplitude!=0){
+          //set perturbations in z (vertical) velocities
+          Real dv = 0; //init & reset every loop
+          //3D case; sum over these terms
+          for (int x=1; x<numWavelengths; x++){
+            for (int y=1; y<numWavelengths; y++){
+              Real Lx = xRange/x; // x;
+              Real Ly = yRange/y; // y;
+              Real thetaX = (rand() * M_PI) / RAND_MAX;
+              Real thetaY = (rand() * M_PI) / RAND_MAX;
+              dv += A * sin(((2*M_PI*x1) / Lx) - thetaX) * sin(((2*M_PI*x3) / Ly) - thetaY);
+            }
           }
+          //change momentum
+          phydro->u(IM2, k, j, i) = dv*density;
         }
-        //change momentum
-        phydro->u(IM2, k, j, i) = dv*density;
-
         if(CR_ENABLED){
           // get CR parameters
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
