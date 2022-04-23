@@ -278,11 +278,16 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   //setup perturbation parameters before loop
   Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
-  Real numWavelengths = floor(pin->GetReal("mesh", "nx1")/5);
+  int XNmax = (int) floor(pin->GetReal("mesh", "nx1")/5);
+  int YNmax = (int) floor(pin->GetReal("mesh", "nx3")/5);
   Real xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
   Real yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
-  srand(10); //arbitrary seed
-  //std::cout<< "\nnumWavelengths=" << numWavelengths;
+  srand(gid); //arbitrary seed for each meshblock
+  //setup random phases for each wavelength
+  Real randsX[XNmax];
+  Real randsY[YNmax];
+  for (int x=1; x<=XNmax; x++) randsX[x] = (rand() * M_PI) / RAND_MAX;
+  for (int y=1; y<=YNmax; y++) randsY[y] = (rand() * M_PI) / RAND_MAX;
 
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
@@ -305,13 +310,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           //set perturbations in z (vertical) velocities
           Real dv = 0; //init & reset every loop
           //3D case; sum over these terms
-          for (int x=1; x<numWavelengths; x++){
-            for (int y=1; y<numWavelengths; y++){
+          for (int x=1; x<=XNmax; x++){
+            for (int y=1; y<=YNmax; y++){
               Real Lx = xRange/x; // x;
               Real Ly = yRange/y; // y;
-              Real thetaX = (rand() * M_PI) / RAND_MAX;
-              Real thetaY = (rand() * M_PI) / RAND_MAX;
-              dv += A * sin(((2*M_PI*x1) / Lx) - thetaX) * sin(((2*M_PI*x3) / Ly) - thetaY);
+              dv += (A / (XNmax*YNmax)) //amplitude scaled
+                    * sin(((2*M_PI*x1) / Lx) - randsX[x])
+                    * sin(((2*M_PI*x3) / Ly) - randsY[y]);
             }
           }
           //change momentum
