@@ -15,7 +15,7 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "ParkerInst"
+#define PROBLEM_GENERATOR "ParkerInst_Perturb"
 
 // coordinate system
 #define COORDINATE_SYSTEM "cartesian"
@@ -98,7 +98,7 @@
 // compiler options
 #define COMPILED_WITH "g++"
 #define COMPILER_COMMAND "g++"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11   -lhdf5" // NOLINT
+#define COMPILED_WITH_OPTIONS " -I/opt/homebrew/Cellar/hdf5/1.12.1_1/include -O3 -std=c++11 -I/opt/homebrew/Cellar/hdf5/1.12.1_1  -L/opt/homebrew/Cellar/hdf5/1.12.1_1/lib  -lhdf5" // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
@@ -107,7 +107,7 @@
 #define NFIELD 3
 #define NWAVE 7
 #define NSCALARS 0
-#define NGHOST 3
+#define NGHOST 2
 #define NCR 4   // cosmic ray transport module variable
 #define NTC 4   // thermal conduction variable
 #define MAX_NSTAGE 5     // maximum number of stages per cycle for time-integrator

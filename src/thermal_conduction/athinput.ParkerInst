@@ -33,14 +33,16 @@ x2max      = 20     # maximum value of X2
 ix2_bc     = user   # inner-X2 boundary flag
 ox2_bc     = user # inner-X2 boundary flag
 
-
-
 nx3        = 8        # Number of zones in X3-direction
 x3min      = -2.5      # minimum value of X3
 x3max      = 2.5       # maximum value of X3
 ix3_bc     = outflow  # inner-X3 boundary flag
 ox3_bc     = outflow  # inner-X3 boundary flag
 
+<meshblock>
+nx1	   = 8
+nx2	   = 8
+nx3	   = 8
 
 <hydro>
 gamma           = 1.6666666666667       # gamma = C_p/C_v

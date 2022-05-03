@@ -3,7 +3,7 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = ParkerInst.cpp
+PROBLEM_FILE = ParkerInst_Perturb.cpp
 COORDINATES_FILE = cartesian.cpp
 EOS_FILE = adiabatic_mhd.cpp
 GENERAL_EOS_FILE = noop.cpp
@@ -14,9 +14,9 @@ MPIFFT_FILE =
 # General compiler specifications
 
 CXX := g++
-CPPFLAGS := 
-CXXFLAGS := -O3 -std=c++11
-LDFLAGS := 
+CPPFLAGS :=  -I/opt/homebrew/Cellar/hdf5/1.12.1_1/include
+CXXFLAGS := -O3 -std=c++11 -I/opt/homebrew/Cellar/hdf5/1.12.1_1
+LDFLAGS :=  -L/opt/homebrew/Cellar/hdf5/1.12.1_1/lib
 LDLIBS :=  -lhdf5
 GCOV_CMD := gcov
 

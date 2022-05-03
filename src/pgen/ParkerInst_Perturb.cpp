@@ -289,6 +289,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   for (int x=1; x<=XNmax; x++) randsX[x] = (rand() * M_PI) / RAND_MAX;
   for (int y=1; y<=YNmax; y++) randsY[y] = (rand() * M_PI) / RAND_MAX;
 
+
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
