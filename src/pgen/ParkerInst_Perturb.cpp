@@ -278,11 +278,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   //setup perturbation parameters before loop
   Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
+  //minimum 2
   int XNmax = (int) floor(pin->GetReal("mesh", "nx1")/5);
   int YNmax = (int) floor(pin->GetReal("mesh", "nx3")/5);
   Real xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
   Real yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
-  srand(gid); //arbitrary seed for each meshblock
+  //srand(gid); //arbitrary seed for each meshblock
+  srand(10); //consistent seed
   //setup random phases for each wavelength
   Real randsX[XNmax];
   Real randsY[YNmax];
