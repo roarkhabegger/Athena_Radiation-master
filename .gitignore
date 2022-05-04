@@ -8,7 +8,7 @@ src/cr/.DS_Store
 bin/
 obj/
 
-job*
-Makefile
-configure.log
-src/defs.hpp
+#job*
+#Makefile
+#configure.log
+#src/defs.hpp
