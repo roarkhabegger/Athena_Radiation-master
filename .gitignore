@@ -9,6 +9,3 @@ bin/
 obj/
 
 job*
-Makefile
-configure.log
-src/defs.hpp

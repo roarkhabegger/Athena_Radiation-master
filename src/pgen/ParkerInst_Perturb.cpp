@@ -288,8 +288,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   //setup random phases for each wavelength
   Real randsX[XNmax];
   Real randsY[YNmax];
-  for (int x=1; x<=XNmax; x++) randsX[x] = (rand() * M_PI) / RAND_MAX;
-  for (int y=1; y<=YNmax; y++) randsY[y] = (rand() * M_PI) / RAND_MAX;
+  for (int x=1; x<=XNmax; x++) randsX[x] = (rand() * 2 * M_PI) / RAND_MAX;
+  for (int y=1; y<=YNmax; y++) randsY[y] = (rand() * 2 * M_PI) / RAND_MAX;
 
 
   // Initialize hydro variable
