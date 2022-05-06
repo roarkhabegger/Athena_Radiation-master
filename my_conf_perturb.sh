@@ -4,5 +4,6 @@ python3 configure.py \
  -b \
  -cr \
  -hdf5 \
---include=/opt/homebrew/Cellar/hdf5/1.12.1 \
---hdf5_path=/opt/homebrew/Cellar/hdf5/1.12.1
+--include=/opt/homebrew/Cellar/hdf5/1.12.1_1 \
+--hdf5_path=/opt/homebrew/Cellar/hdf5/1.12.1_1
+
