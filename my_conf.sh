@@ -1,6 +1,7 @@
 python3 configure.py \
  --prob=ParkerInst \
- --nghost=3 \
- -b \
+ --nghost=2 \
  -cr \
- -hdf5 
+ -b \
+ --nscalars=2 \
+ -hdf5
