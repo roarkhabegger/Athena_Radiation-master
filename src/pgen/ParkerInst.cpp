@@ -148,7 +148,7 @@ Real densProfile(Real x1, Real x2, Real x3)
 
 Real presProfile(Real x1, Real x2, Real x3)
 {
-  Real pres = pres0*myGamma/dens0*densProfile(x1,x2,x3);
+  Real pres = pres0/dens0*densProfile(x1,x2,x3);
   return pres;
 }
 
@@ -304,7 +304,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
-
         }
         // Setup scalar tracker for flux tubes
         if ((NSCALARS > 0) ) {
@@ -765,4 +764,53 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
   }
 
   }
+}
+
+//----------------------------------------------------------------------------------------
+void Mesh::UserWorkInLoop(void)
+{
+  MeshBlock *pmb = pblock;
+  Real vmax = pmb->pcr->vmax;
+  Real vcX = 0.0, vcY = 0.0, vcZ = 0.0;
+  Real vFast  = 0.0;
+  if (pmb->pcr->vmax_Edit) {
+    while(pmb != nullptr){
+      int kl = pmb->ks, ku = pmb->ke;
+      int jl = pmb->js, ju = pmb->je;
+      int il = pmb->is, iu = pmb->ie;
+      for(int k=kl; k<=ku; ++k){
+        for(int j=jl; j<=ju; ++j){
+          for(int i=il; i<=iu; ++i){
+            //vcX = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k,j,i-1))/pmb->pcr->u_cr(CRE,k,j,i);
+            //vcY = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k,j-1,i))/pmb->pcr->u_cr(CRE,k,j,i);
+            //vcZ = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k-1,j,i))/pmb->pcr->u_cr(CRE,k,j,i);
+            vcX = pmb->pfield->b.x1f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
+            vcY = pmb->pfield->b.x2f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
+            vcZ = pmb->pfield->b.x3f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
+            vcX = pmb->phydro->u(IM1,k,j,i)/pmb->phydro->u(IDN,k,j,i);
+            vcY = pmb->phydro->u(IM2,k,j,i)/pmb->phydro->u(IDN,k,j,i);
+            vcZ = pmb->phydro->u(IM3,k,j,i)/pmb->phydro->u(IDN,k,j,i);
+            vFast = std::max(vFast,std::sqrt( SQR(vcX) + SQR(vcY) + SQR(vcZ) ));
+          }
+        }
+      }
+      pmb = pmb->next;
+    }
+#ifdef MPI_PARALLEL
+    MPI_Allreduce(MPI_IN_PLACE,&vFast,1,MPI_ATHENA_REAL,MPI_MAX,
+                  MPI_COMM_WORLD);
+#endif
+    vFast = vFast;
+    pmb = pblock;
+    //std::cout<< "vMax  = " << vmax << std::endl;
+    //std::cout<< "vFast = " << vFast << std::endl;
+
+    if (vFast < vmax ) {
+      while(pmb != nullptr){
+        pmb->pcr->vmax = vFast;
+        pmb = pmb->next;
+      }
+    }
+  }
+
 }
