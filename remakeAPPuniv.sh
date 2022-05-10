@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --partition=astro3 
+#SBATCH --partition=univ2 
 #SBATCH --time=0-05:00:00 #runtime in days-hh:mm:ss
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8 #cpus per node
@@ -11,8 +11,4 @@ module load hdf5
 module load gcc
 module load netcdf-c++4
 
-echo 'astro'
-make clean
-make clean
-sh my_conf.sh
 make

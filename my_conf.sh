@@ -1,7 +1,11 @@
 python3 configure.py \
  --prob=ParkerInst \
  --nghost=2 \
- -cr \
  -b \
+ -cr \
+ -hdf5 \
+ -mpi \
  --nscalars=2 \
- -hdf5
+ --mpiccmd=h5pcc \
+ --cflag='-DH5_HAVE_PARALLEL -lstdc++' \
+ --cxx='g++-simd'
