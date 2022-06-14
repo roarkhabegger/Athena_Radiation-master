@@ -1,6 +1,6 @@
 <comment>
 problem   = Parker Instability from CR injection
-reference = 
+reference =
 configure = --prob=ParkerInst
 
 <job>
@@ -11,53 +11,50 @@ file_type  = hdf5       # Binary data dump
 dt         = 1.02271217e-1   # time increment between outputs
 variable   = prim
 
+
 <time>
 cfl_number = 0.2      # The Courant, Friedrichs, & Lewy (CFL) Number
 integrator = rk3
-nlim       = 1 # cycle limit
+nlim       = -1 # cycle limit
 tlim       = 1.02271217e1  # time limit
-ncycle_out = 1000
+ncycle_out = 100
 
 <mesh>
-nx1        = 128    # Number of zones in X1-direction
+nx1        = 32    # Number of zones in X1-direction
 x1min      = -10    # minimum value of X1
 x1max      = 10    # maximum value of X1
 ix1_bc     = outflow  # inner-X1 boundary flag
 ox1_bc     = outflow          # inner-X1 boundary flag
 
 x2rat      = 1
-nx2        = 192  # Number of zones in X2-direction
-x2min      = -10    # minimum value of X2
+nx2        = 64  # Number of zones in X2-direction
+x2min      = -20    # minimum value of X2
 x2max      = 20     # maximum value of X2
 ix2_bc     = user   # inner-X2 boundary flag
 ox2_bc     = user # inner-X2 boundary flag
 
-
-
-nx3        = 1       # Number of zones in X3-direction
-x3min      = -0.15625     # minimum value of X3
-x3max      = 0.15625       # maximum value of X3
+nx3        = 8        # Number of zones in X3-direction
+x3min      = -2.5      # minimum value of X3
+x3max      = 2.5       # maximum value of X3
 ix3_bc     = outflow  # inner-X3 boundary flag
 ox3_bc     = outflow  # inner-X3 boundary flag
 
-
 <meshblock>
-nx1 = 16
-nx2 = 16
-nx3 = 1
-
+nx1	   = 8
+nx2	   = 8
+nx3	   = 8
 
 <hydro>
 gamma           = 1.6666666666667       # gamma = C_p/C_v
 #iso_sound_speed = 1.0
-pfloor = 1e-6
-dfloor = 1e-6
+pfloor = 1e-5
+dfloor = 1e-5
 
 
 <cr>
-vmax = 8.99377374e3
-sigmaPerp = 3.08354289e6
-sigmaParl = 3.08354289e6
+vmax = 100
+sigmaPerp = 3.08567758e6
+sigmaParl = 3.08567758e6
 src_flag = 1
 vs_flag = 1
 
@@ -65,26 +62,26 @@ vs_flag = 1
 <problem>
   xVel = 0.0
   Dens = 1.0
-  GravNumScaleHeight = 4.11423678e-1
+  GravNumScaleHeight = 8.81622166e-1
   Pres = 1.0
   Grav = 1.23427103
-  ScaleH = 2.43058447e0
+  ScaleH = 1.13427275
 
-  alpha = 1
-  beta = 1
+  alpha = 0.2
+  beta = 0.2
 
-  pertX = 0.078125
-  pertY = 0.078125
-  pertZ = 1.015625
-  snEnerFrac = 1e-1
-  snEner =3.40367719e1
-  pertR = 5
-  
-  scalar1Y = 0.078125
-  scalar1Z = 1.015625
-  scalar1R = 0.5
+  pertX = 0.3125
+  pertY = 0.3125
+  pertZ = 1.25
+  snEnerFrac = 1.0
+  #THIS IS PERTURBATION
+  snEner =0.0 #3.40367719e1
+  pertR = 4
 
-  scalar2Y = 0.078125
+  scalar1Y = 0.3125
+  scalar1Z = 1.25
+  scalar1R = 1.0
+
+  scalar2Y = 0.3125
   scalar2Z = 0.0
   scalar2R = 1.0
-	
