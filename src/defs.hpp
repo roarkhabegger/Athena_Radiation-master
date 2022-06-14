@@ -106,8 +106,8 @@
 #define NHYDRO 5
 #define NFIELD 3
 #define NWAVE 7
-#define NSCALARS 0
-#define NGHOST 3
+#define NSCALARS 2
+#define NGHOST 2
 #define NCR 4   // cosmic ray transport module variable
 #define NTC 4   // thermal conduction variable
 #define MAX_NSTAGE 5     // maximum number of stages per cycle for time-integrator

@@ -4,7 +4,7 @@ Your Athena++ distribution has now been configured with the following options:
   Equation of state:          adiabatic
   Riemann solver:             hlld
   Magnetic fields:            ON
-  Number of scalars:          0
+  Number of scalars:          2
   Special relativity:         OFF
   General relativity:         OFF
   Radiative Transfer:         OFF
@@ -20,10 +20,10 @@ Your Athena++ distribution has now been configured with the following options:
   Linker flags:                 -lhdf5
   Floating-point precision:   double
   Number of ghost cells:      2
-  MPI parallelism:            ON
+  MPI parallelism:            OFF
   OpenMP parallelism:         OFF
   FFT:                        OFF
   HDF5 output:                ON
-  HDF5 precision:             double
-  Compiler:                   g++-simd
-  Compilation command:        h5pcc  -O3 -std=c++11 -fopenmp-simd -fwhole-program -flto -ffast-math -march=native -fprefetch-loop-arrays -DH5_HAVE_PARALLEL -lstdc++
+  HDF5 precision:             single
+  Compiler:                   g++
+  Compilation command:        g++  -O3 -std=c++11
