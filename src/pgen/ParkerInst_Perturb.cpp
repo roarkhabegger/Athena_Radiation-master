@@ -43,7 +43,7 @@
 
 
 //======================================================================================
-/*! \file ParkerInst.cpp
+/*! \file ParkerInst_Perturb.cpp
  *  Magneto-hydrostatic equilibrium for local sim of a galactic disk (vertical structure)
  *  Perturbation is gaussian profile in CR Pressure
  *====================================================================================*/
@@ -83,16 +83,9 @@ Real crD; // percentage of SN energy in CRs - in multiples of 10%
 Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
                 // in units of 10pc
-Real crThermal;
-Real crLinear;
-Real randAmplitude;
-int XNmax;
-int YNmax;
-Real xRange;
-Real yRange;
-Real *randsX;
-Real *randsY;
 
+//Random yvel perturbation variable
+Real randAmplitude;
 
 Real s1Y;
 Real s1Z;
@@ -157,7 +150,7 @@ Real densProfile(Real x1, Real x2, Real x3)
 
 Real presProfile(Real x1, Real x2, Real x3)
 {
-  Real pres = pres0/dens0*densProfile(x1,x2,x3);
+  Real pres = pres0*myGamma/dens0*densProfile(x1,x2,x3);
   return pres;
 }
 
@@ -223,6 +216,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   g0 =pin->GetReal("problem","Grav");
   H  =pin->GetReal("problem","ScaleH");
+  randAmplitude = pin->GetReal("problem", "randAmplitude");
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
@@ -237,14 +231,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     crEsn = pin->GetReal("problem","snEner");
     crD = pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
-    crThermal = pin->GetOrAddReal("problem","ThermalBlast",-1);
-    crLinear = pin->GetOrAddReal("problem","LinearPert",-1);
-    if (crLinear > 0.0) {
-      randAmplitude = pin->GetReal("problem", "randAmplitude");
-      XNmax = (int) pin->GetOrAddReal("problem","XNmax",floor(pin->GetReal("mesh", "nx1")/5));
-      YNmax = (int) pin->GetOrAddReal("problem","YNmax",floor(pin->GetReal("mesh", "nx3")/5));
-    }
-    // std::cout << crEsn << "  "<< crD << std::endl;
   }
   // Setup scalar tracker for perturbation
   if ((NSCALARS > 0) ) {
@@ -286,33 +272,33 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //Setup initial mesh and variables
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
-  //From Sherry's ParkerInst_Perturb
-  if (crLinear > 0.0) {
-    //setup perturbation parameters before loop
-    Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
-    //minimum 2
-    xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
-    yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
-    //srand(gid); //arbitrary seed for each meshblock
-    srand(10); //consistent seed
-    //setup random phases for each wavelength
-    randsX = (Real*) malloc(sizeof(double[XNmax]));
-    randsY = (Real*) malloc(sizeof(double[YNmax]));
-    //Real randsY[YNmax];
-    for (int x=0; x<XNmax; x++) randsX[x] = (rand() * 2 * M_PI) / RAND_MAX;
-    for (int y=0; y<YNmax; y++) randsY[y] = (rand() * 2 * M_PI) / RAND_MAX;
-  }
-
 
   // Derived variables
   //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
+
+  //setup perturbation parameters before loop
+  Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
+  //minimum 2
+  int XNmax = (int) floor(pin->GetReal("mesh", "nx1")/5);
+  int YNmax = (int) floor(pin->GetReal("mesh", "nx3")/5);
+  Real xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
+  Real yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
+  //srand(gid); //arbitrary seed for each meshblock
+  srand(10); //consistent seed
+  //setup random phases for each wavelength
+  Real randsX[XNmax];
+  Real randsY[YNmax];
+  for (int x=1; x<=XNmax; x++) randsX[x] = (rand() * 2 * M_PI) / RAND_MAX;
+  for (int y=1; y<=YNmax; y++) randsY[y] = (rand() * 2 * M_PI) / RAND_MAX;
+
+
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
-        Real x1 = pcoord->x1v(i);
-        Real x2 = pcoord->x2v(j);
-        Real x3 = pcoord->x3v(k);
+        Real x1 = pcoord->x1v(i); //x
+        Real x2 = pcoord->x2v(j); //z
+        Real x3 = pcoord->x3v(k); //y
         Real density = densProfile(x1,x2,x3);
         Real pressure = presProfile(x1,x2,x3);
 
@@ -323,16 +309,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM3,k,j,i) = 0.0;
         phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx);
 
-        //FROM Sherry's ParkerInst_Perturb
-        if(crLinear > 0.0){
+        if(randAmplitude!=0){
           //set perturbations in z (vertical) velocities
           Real dv = 0; //init & reset every loop
-          Real A = randAmplitude;
           //3D case; sum over these terms
-          for (int x=0; x<XNmax; x++){
-            for (int y=0; y<YNmax; y++){
-              Real Lx = xRange/(x+1); // x;
-              Real Ly = yRange/(y+1); // y;
+          for (int x=1; x<=XNmax; x++){
+            for (int y=1; y<=YNmax; y++){
+              Real Lx = xRange/x; // x;
+              Real Ly = yRange/y; // y;
               dv += (A / (XNmax*YNmax)) //amplitude scaled
                     * sin(((2*M_PI*x1) / Lx) - randsX[x])
                     * sin(((2*M_PI*x3) / Ly) - randsY[y]);
@@ -341,7 +325,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           //change momentum
           phydro->u(IM2, k, j, i) = dv*density;
         }
-
         if(CR_ENABLED){
           // get CR parameters
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
@@ -350,16 +333,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real dPcdz = -1.0*beta*presProfile(x1,x2,x3)*tanh(x2/(nGrav));
 
           // set CR variables
-          if (crThermal < 0.0) {
-            pcr->u_cr(CRE,k,j,i) = 3.0*(crp)+pertVal * crD * crEsn;
-          } else {
-            pcr->u_cr(CRE,k,j,i) = 3.0*(crp);
-            phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
-          }
+          pcr->u_cr(CRE,k,j,i) = 3.0*(crp+pertVal * crD * crEsn);
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
+
         }
         // Setup scalar tracker for flux tubes
         if ((NSCALARS > 0) ) {
@@ -820,53 +799,4 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
   }
 
   }
-}
-
-//----------------------------------------------------------------------------------------
-void Mesh::UserWorkInLoop(void)
-{
-  MeshBlock *pmb = pblock;
-  Real vmax = pmb->pcr->vmax;
-  Real vcX = 0.0, vcY = 0.0, vcZ = 0.0;
-  Real vFast  = 0.0;
-  if (pmb->pcr->vmax_Edit) {
-    while(pmb != nullptr){
-      int kl = pmb->ks, ku = pmb->ke;
-      int jl = pmb->js, ju = pmb->je;
-      int il = pmb->is, iu = pmb->ie;
-      for(int k=kl; k<=ku; ++k){
-        for(int j=jl; j<=ju; ++j){
-          for(int i=il; i<=iu; ++i){
-            //vcX = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k,j,i-1))/pmb->pcr->u_cr(CRE,k,j,i);
-            //vcY = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k,j-1,i))/pmb->pcr->u_cr(CRE,k,j,i);
-            //vcZ = (pmb->pcr->u_cr(CRE,k,j,i)-pmb->pcr->u_cr(CRE,k-1,j,i))/pmb->pcr->u_cr(CRE,k,j,i);
-            vcX = pmb->pfield->b.x1f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
-            vcY = pmb->pfield->b.x2f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
-            vcZ = pmb->pfield->b.x3f(k,j,i)/std::sqrt(pmb->phydro->u(IDN,k,j,i));
-            vcX = pmb->phydro->u(IM1,k,j,i)/pmb->phydro->u(IDN,k,j,i);
-            vcY = pmb->phydro->u(IM2,k,j,i)/pmb->phydro->u(IDN,k,j,i);
-            vcZ = pmb->phydro->u(IM3,k,j,i)/pmb->phydro->u(IDN,k,j,i);
-            vFast = std::max(vFast,std::sqrt( SQR(vcX) + SQR(vcY) + SQR(vcZ) ));
-          }
-        }
-      }
-      pmb = pmb->next;
-    }
-#ifdef MPI_PARALLEL
-    MPI_Allreduce(MPI_IN_PLACE,&vFast,1,MPI_ATHENA_REAL,MPI_MAX,
-                  MPI_COMM_WORLD);
-#endif
-    vFast = vFast;
-    pmb = pblock;
-    //std::cout<< "vMax  = " << vmax << std::endl;
-    //std::cout<< "vFast = " << vFast << std::endl;
-
-    if (vFast < vmax ) {
-      while(pmb != nullptr){
-        pmb->pcr->vmax = vFast;
-        pmb = pmb->next;
-      }
-    }
-  }
-
 }
