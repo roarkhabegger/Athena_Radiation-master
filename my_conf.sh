@@ -5,6 +5,7 @@ python3 configure.py \
  -cr \
  -hdf5 \
  -mpi \
+ -omp \
  --nscalars=2 \
  --mpiccmd=h5pcc \
  --cflag='-DH5_HAVE_PARALLEL -lstdc++' \
