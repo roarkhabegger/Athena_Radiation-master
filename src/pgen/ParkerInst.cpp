@@ -83,6 +83,15 @@ Real crD; // percentage of SN energy in CRs - in multiples of 10%
 Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
                 // in units of 10pc
+Real crThermal;
+Real crLinear;
+Real randAmplitude;
+int XNmax;
+int YNmax;
+Real xRange;
+Real yRange;
+Real *randsX;
+Real *randsY;
 
 
 Real s1Y;
@@ -225,10 +234,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     crPertCenterZ = pin->GetReal("problem","pertZ");
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
-    crEsn= pin->GetReal("problem","snEner");
-    crD= pin->GetReal("problem","snEnerFrac");
+    crEsn = pin->GetReal("problem","snEner");
+    crD = pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
-    std::cout << crEsn << "  "<< crD << std::endl;
+    crThermal = pin->GetOrAddReal("problem","ThermalBlast",-1);
+    crLinear = pin->GetOrAddReal("problem","LinearPert",-1);
+    if (crLinear > 0.0) {
+      randAmplitude = pin->GetReal("problem", "randAmplitude");
+      XNmax = (int) pin->GetOrAddReal("problem","XNmax",floor(pin->GetReal("mesh", "nx1")/5));
+      YNmax = (int) pin->GetOrAddReal("problem","YNmax",floor(pin->GetReal("mesh", "nx3")/5));
+    }
+    // std::cout << crEsn << "  "<< crD << std::endl;
   }
   // Setup scalar tracker for perturbation
   if ((NSCALARS > 0) ) {
@@ -270,11 +286,26 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //Setup initial mesh and variables
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
+  //From Sherry's ParkerInst_Perturb
+  if (crLinear > 0.0) {
+    //setup perturbation parameters before loop
+    Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
+    //minimum 2
+    xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
+    yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
+    //srand(gid); //arbitrary seed for each meshblock
+    srand(10); //consistent seed
+    //setup random phases for each wavelength
+    randsX = (Real*) malloc(sizeof(double[XNmax]));
+    randsY = (Real*) malloc(sizeof(double[YNmax]));
+    //Real randsY[YNmax];
+    for (int x=0; x<XNmax; x++) randsX[x] = (rand() * 2 * M_PI) / RAND_MAX;
+    for (int y=0; y<YNmax; y++) randsY[y] = (rand() * 2 * M_PI) / RAND_MAX;
+  }
+
 
   // Derived variables
   //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
-
-
   // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -292,6 +323,25 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM3,k,j,i) = 0.0;
         phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx);
 
+        //FROM Sherry's ParkerInst_Perturb
+        if(crLinear > 0.0){
+          //set perturbations in z (vertical) velocities
+          Real dv = 0; //init & reset every loop
+          Real A = randAmplitude;
+          //3D case; sum over these terms
+          for (int x=0; x<XNmax; x++){
+            for (int y=0; y<YNmax; y++){
+              Real Lx = xRange/(x+1); // x;
+              Real Ly = yRange/(y+1); // y;
+              dv += (A / (XNmax*YNmax)) //amplitude scaled
+                    * sin(((2*M_PI*x1) / Lx) - randsX[x])
+                    * sin(((2*M_PI*x3) / Ly) - randsY[y]);
+            }
+          }
+          //change momentum
+          phydro->u(IM2, k, j, i) = dv*density;
+        }
+
         if(CR_ENABLED){
           // get CR parameters
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
@@ -300,7 +350,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real dPcdz = -1.0*beta*presProfile(x1,x2,x3)*tanh(x2/(nGrav));
 
           // set CR variables
-          pcr->u_cr(CRE,k,j,i) = 3.0*(crp)+pertVal * crD * crEsn;
+          if (crThermal < 0.0) {
+            pcr->u_cr(CRE,k,j,i) = 3.0*(crp)+pertVal * crD * crEsn;
+          } else {
+            pcr->u_cr(CRE,k,j,i) = 3.0*(crp);
+            phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
+          }
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;

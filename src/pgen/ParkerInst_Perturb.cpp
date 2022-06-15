@@ -228,8 +228,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     crPertCenterZ = pin->GetReal("problem","pertZ");
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
-    crEsn= pin->GetReal("problem","snEner");
-    crD= pin->GetReal("problem","snEnerFrac");
+    crEsn = pin->GetReal("problem","snEner");
+    crD = pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
   }
   // Setup scalar tracker for perturbation
