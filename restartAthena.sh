@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --partition=univ2 
+#SBATCH --partition=astro3
 #SBATCH --time=4-00:00:00 #runtime in days-hh:mm:ss
 #SBATCH --nodes=16
 #SBATCH --ntasks-per-node=20 #cpus per node
@@ -19,5 +19,5 @@ cd $bas/$base/$run
 pwd
 ls
 
-./univAthena -i athinput.$base -m 320 > load.log
-mpiexec -n 320 univAthena -i athinput.$base -t 95:00:00 > athena.01.log
+
+mpiexec -n 320 astroAthena -r parker.final.rst -i athinput.$base -t 95:00:00 > athena.02.log
