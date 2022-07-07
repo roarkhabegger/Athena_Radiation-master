@@ -109,6 +109,7 @@ Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
 Real gravProfile(Real x1, Real x2, Real x3);
 Real pertProfile(Real x1, Real x2, Real x3);
+Real fcProfile(Real x1, Real x2, Real x3);
 Real s1Profile(Real x1, Real x2, Real x3);
 Real s2Profile(Real x1, Real x2, Real x3);
 
@@ -119,6 +120,9 @@ Real LogMeshSpacingX2(Real x, RegionSize rs);
 void mySource(MeshBlock *pmb, const Real time, const Real dt,
                const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
                AthenaArray<Real> &cons);
+void CRSource(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &u_cr);
 
 //x2 boundaries with vacuum
 void DiodeInnerX2(MeshBlock *pmb, Coordinates *pco, AthenaArray<Real> &prim,
@@ -174,6 +178,13 @@ Real pertProfile(Real x1, Real x2, Real x3)
   return p;
   //Coefficient is (100pc)^2/200 pc^2
 }
+Real fcProfile(Real x1, Real x2, Real x3)
+{
+  Real  fcz = -1*(densProfile(x1,x2,x3)*gravProfile(x1,x2,x3))/sigmaPerp;
+  fcz *= (beta/(1+alpha+beta)) ;
+  return fcz;
+}
+
 
 Real s1Profile(Real x1, Real x2, Real x3)
 {
@@ -204,6 +215,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   if(CR_ENABLED){
    pcr->EnrollOpacityFunction(Diffusion);
+   // pcr->EnrollUserCRSource(CRSource);
   }
 }
 
@@ -351,14 +363,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
           // set CR variables
           if (crThermal < 0.0) {
-            pcr->u_cr(CRE,k,j,i) = 3.0*(crp)+pertVal * crD * crEsn;
+            pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn;
           } else {
             pcr->u_cr(CRE,k,j,i) = 3.0*(crp);
             phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
           }
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
-          pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;
+          pcr->u_cr(CRF2,k,j,i) = fcProfile(x1,x2,x3);//-1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
         }
         // Setup scalar tracker for flux tubes
@@ -439,6 +451,31 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   return;
 }
 
+//Source function with gravity and cooling
+void CRSource(MeshBlock *pmb, const Real time, const Real dt,
+  const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+  AthenaArray<Real> &u_cr)
+{
+
+
+  for (int k=pmb->ks; k<=pmb->ke; ++k) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
+  #pragma omp simd
+      for (int i=pmb->is; i<=pmb->ie; ++i) {
+        //GRAVITY
+        Real x2 = pmb->pcoord->x2v(j);
+        Real xi = x2/(nGrav*H);
+        Real arg = (1/(nGrav*SQR(cosh(xi))) - SQR(tanh(xi)))*pow(cosh(xi),-1.0*nGrav);
+        Real coeff = (beta/(1+alpha+beta))/ sigmaPerp * g0 * dens0/H;
+        Real q =  arg*coeff;
+        u_cr(CRE,k,j,i) += q;
+
+        }
+      }
+    }
+
+  return;
+}
 //Source function with gravity and cooling
 void mySource(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
