@@ -63,7 +63,7 @@ Real nGrav;    // nGrav is scale height of stars divided by scale height of gas
 Real alpha;    // Ratio of magnetic pressure to gas pressure
 Real beta;     // Ratio of cosmic ray pressure to gas pressure
 
-Real H;
+Real h;
 
 //Floors for Diode boundary conds
 Real dfloor, pfloor; // Floor values for density and rpessure
@@ -108,7 +108,8 @@ Real s2dR;
 Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
 Real gravProfile(Real x1, Real x2, Real x3);
-Real pertProfile(Real x1, Real x2, Real x3);
+Real potProfile(Real x1, Real x2, Real x3);
+// Real pertProfile(Real x1, Real x2, Real x3);
 Real fcProfile(Real x1, Real x2, Real x3);
 Real s1Profile(Real x1, Real x2, Real x3);
 Real s2Profile(Real x1, Real x2, Real x3);
@@ -155,21 +156,26 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 //Implement functions
 Real densProfile(Real x1, Real x2, Real x3)
 {
-  Real rho = dens0*pow(cosh(x2/(nGrav*H)),-1.0*nGrav);
+  Real rho = dens0*pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
   return rho;
 }
 
 Real presProfile(Real x1, Real x2, Real x3)
 {
-  Real pres = pres0/dens0*densProfile(x1,x2,x3);
+  Real pres = pres0*pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
   return pres;
 }
 
 Real gravProfile(Real x1, Real x2, Real x3)
 {
-  Real g = -1*g0*tanh(x2/(nGrav*H));//*g0;
+  Real g = -1*g0*tanh(x2/(nGrav*h));//*g0;
   return g;
 }
+// Real potProfile(Real x1, Real x2, Real x3)
+// {
+//   Real phi = g0*nGrav*h*log(abs( cosh(x2/(nGrav*h)) ));//*g0;
+//   return phi;
+// }
 
 Real pertProfile(Real x1, Real x2, Real x3)
 {
@@ -180,8 +186,8 @@ Real pertProfile(Real x1, Real x2, Real x3)
 }
 Real fcProfile(Real x1, Real x2, Real x3)
 {
-  Real  fcz = -1*(densProfile(x1,x2,x3)*gravProfile(x1,x2,x3))/sigmaPerp;
-  fcz *= (beta/(1+alpha+beta)) ;
+  Real  fcz = pow(cosh(x2/(nGrav*h)),-1.0*nGrav)*tanh(x2/(nGrav*h));
+  fcz *= beta*pres0/(h*sigmaPerp) ;
   return fcz;
 }
 
@@ -215,7 +221,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   if(CR_ENABLED){
    pcr->EnrollOpacityFunction(Diffusion);
-   // pcr->EnrollUserCRSource(CRSource);
+   pcr->EnrollUserCRSource(CRSource);
   }
 }
 
@@ -234,7 +240,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   dens0 = pin->GetReal("problem","Dens");
 
   g0 =pin->GetReal("problem","Grav");
-  H  =pin->GetReal("problem","ScaleH");
+  h  =pin->GetReal("problem","ScaleH");
 
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
@@ -327,13 +333,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real x3 = pcoord->x3v(k);
         Real density = densProfile(x1,x2,x3);
         Real pressure = presProfile(x1,x2,x3);
+        // Real pot = potProfile(x1,x2,x3)*density;
 
         //set hydro variables
         phydro->u(IDN,k,j,i) = density;
         phydro->u(IM1,k,j,i) = vx*density;
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
-        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx);
+        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx) ;//+ pot;
 
         //FROM Sherry's ParkerInst_Perturb
         if(crLinear > 0.0){
@@ -357,15 +364,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         if(CR_ENABLED){
           // get CR parameters
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
-          Real pertVal = pertProfile(x1,x2,x3);
-          Real pertValNoX = pertProfile(0.0,x2,x3);
-          Real dPcdz = -1.0*beta*presProfile(x1,x2,x3)*tanh(x2/(nGrav));
+          Real pertVal = pertProfile(x1,x2,x3);;
 
           // set CR variables
           if (crThermal < 0.0) {
             pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn;
           } else {
-            pcr->u_cr(CRE,k,j,i) = 3.0*(crp);
+            pcr->u_cr(CRE,k,j,i) = 3.0*crp;
             phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
           }
           //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
@@ -456,19 +461,15 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &u_cr)
 {
-
-
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
   #pragma omp simd
       for (int i=pmb->is; i<=pmb->ie; ++i) {
         //GRAVITY
-        Real x2 = pmb->pcoord->x2v(j);
-        Real xi = x2/(nGrav*H);
+        Real xi = pmb->pcoord->x2v(j)/(nGrav*h);
         Real arg = (1/(nGrav*SQR(cosh(xi))) - SQR(tanh(xi)))*pow(cosh(xi),-1.0*nGrav);
-        Real coeff = (beta/(1+alpha+beta))/ sigmaPerp * g0 * dens0/H;
-        Real q =  arg*coeff;
-        u_cr(CRE,k,j,i) += q;
+        Real coeff = (beta* pres0)/ (sigmaPerp*SQR(h));
+        u_cr(CRE,k,j,i) += arg*coeff*dt;
 
         }
       }
