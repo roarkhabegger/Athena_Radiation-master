@@ -1,0 +1,104 @@
+<comment>
+problem   = Parker Instability from CR injection
+reference =
+configure = --prob=ParkerInst
+
+<job>
+problem_id = parker        # problem ID: basename of output filenames
+
+<output1>
+file_type  = hdf5       # Binary data dump
+dt         = 1.02271217e0   # time increment between outputs
+variable   = prim
+
+<output2>
+file_type  = rst      # Binary data dump
+dt         = 1.02271217e1  # time increment between outputs
+
+
+<time>
+cfl_number = 0.2      # The Courant, Friedrichs, & Lewy (CFL) Number
+integrator = rk3
+nlim       = 0 # cycle limit
+tlim       = 6.13627299e1    # time limit
+ncycle_out = 1000
+
+<mesh>
+nx1        = 512    # Number of zones in X1-direction
+x1min      = -80    # minimum value of X1
+x1max      = 80    # maximum value of X1
+ix1_bc     = periodic  # inner-X1 boundary flag
+ox1_bc     = periodic        # inner-X1 boundary flag
+
+x2rat      = 1
+nx2        = 512  # Number of zones in X2-direction
+x2min      = -80    # minimum value of X2
+x2max      = 80    # maximum value of X2
+ix2_bc     = user   # inner-X2 boundary flag
+ox2_bc     = user # inner-X2 boundary flag
+
+# above has resolution of 31.25 pc
+
+
+nx3        = 1      # Number of zones in X3-direction
+x3min      = -1    # minimum value of X3
+x3max      = 1      # maximum value of X3
+ix3_bc     = periodic # inner-X3 boundary flag
+ox3_bc     = periodic  # inner-X3 boundary flag
+
+
+<meshblock>
+nx1 = 64
+nx2 = 64
+nx3 = 1
+
+#Above gives 64 meshblocks i.e. can't use mpiexec -n 65
+
+
+<hydro>
+gamma           = 1.6666666666667       # gamma = C_p/C_v
+#iso_sound_speed = 1.0
+pfloor = 1e-5
+dfloor = 1e-5 #Might need to change this
+
+
+<cr>
+vmax = 2.99792458e2
+sigmaPerp = 3.08354289e4
+sigmaParl = 3.08354289e4
+src_flag = 1
+vs_flag = 1
+
+
+<problem>
+  xVel = 0.0
+  Dens = 0.676790532
+  GravNumScaleHeight = 2.0
+  Pres = 0.818920389
+  Grav = 2.70234602
+  ScaleH = 2.5
+
+  alpha = 3.33333333
+  beta = 1.25
+
+  pertX = 0.05
+  pertY = 0.05
+  pertZ = 1.05
+  snEnerFrac =0.0
+  snEner = 0.0
+  pertR = 0.0
+
+  scalar1Y = 0.05
+  scalar1Z = 1.05
+  scalar1R = 0.5
+
+  scalar2Y = 0.05
+  scalar2Z = 2.05
+  scalar2R = 0.5
+
+  ThermalBlast = -1
+
+  LinearPert = 1
+  randAmplitude = 1 # Sherry Check these for your implementation
+  XNMax = 2
+  YNMax = 2
