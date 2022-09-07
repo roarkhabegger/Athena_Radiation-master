@@ -279,8 +279,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   //setup perturbation parameters before loop
   Real A = randAmplitude; //CHANGE TO COMPUTATIONAL UNITS (10^-12:?)
   //minimum 2
-  int XNmax = (int) floor(pin->GetReal("mesh", "nx1")/5);
-  int YNmax = (int) floor(pin->GetReal("mesh", "nx3")/5);
+  int XNmax = fmax((int) floor(pin->GetReal("mesh", "nx1")/5), 1);
+  int YNmax = fmax((int) floor(pin->GetReal("mesh", "nx3")/5), 1);
   Real xRange = pin->GetReal("mesh", "x1max") - pin->GetReal("mesh", "x1min");
   Real yRange = pin->GetReal("mesh", "x3max") - pin->GetReal("mesh", "x3min");
   //srand(gid); //arbitrary seed for each meshblock
@@ -312,14 +312,21 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         if(randAmplitude!=0){
           //set perturbations in z (vertical) velocities
           Real dv = 0; //init & reset every loop
-          //3D case; sum over these terms
           for (int x=1; x<=XNmax; x++){
-            for (int y=1; y<=YNmax; y++){
+            if(YNmax==0){ 
+              //2D case
               Real Lx = xRange/x; // x;
-              Real Ly = yRange/y; // y;
-              dv += (A / (XNmax*YNmax)) //amplitude scaled
-                    * sin(((2*M_PI*x1) / Lx) - randsX[x])
-                    * sin(((2*M_PI*x3) / Ly) - randsY[y]);
+              dv += (A / (XNmax)) //amplitude scaled
+                    * sin(((2*M_PI*x1) / Lx) - randsX[x]);
+            }else{
+              //3D case
+              for (int y=1; y<=YNmax; y++){
+                Real Lx = xRange/x; // x;
+                Real Ly = yRange/y; // y;
+                dv += (A / (XNmax*YNmax)) //amplitude scaled
+                      * sin(((2*M_PI*x1) / Lx) - randsX[x])
+                      * sin(((2*M_PI*x3) / Ly) - randsY[y]);
+              }
             }
           }
           //change momentum

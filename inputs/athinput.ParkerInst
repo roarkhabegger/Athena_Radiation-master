@@ -11,15 +11,11 @@ file_type  = hdf5       # Binary data dump
 dt         = 1.02271217e0   # time increment between outputs
 variable   = prim
 
-<output2>
-file_type  = rst      # Binary data dump
-dt         = 1.02271217e1  # time increment between outputs
-
 
 <time>
 cfl_number = 0.2      # The Courant, Friedrichs, & Lewy (CFL) Number
 integrator = rk3
-nlim       = 0 # cycle limit
+nlim       = 1 # cycle limit
 tlim       = 6.13627299e1    # time limit
 ncycle_out = 1000
 
@@ -58,8 +54,8 @@ nx3 = 1
 <hydro>
 gamma           = 1.6666666666667       # gamma = C_p/C_v
 #iso_sound_speed = 1.0
-pfloor = 1e-5
-dfloor = 1e-5 #Might need to change this
+pfloor = 1e-12
+dfloor = 1e-12 #Might need to change this
 
 
 <cr>
@@ -99,6 +95,6 @@ vs_flag = 1
   ThermalBlast = -1
 
   LinearPert = 1
-  randAmplitude = 1 # Sherry Check these for your implementation
-  XNMax = 2
-  YNMax = 2
+  randAmplitude = 1e1 # Sherry Check these for your implementation
+  XNMax = 1
+  YNMax = 0

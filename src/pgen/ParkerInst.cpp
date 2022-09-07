@@ -259,8 +259,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     crLinear = pin->GetOrAddReal("problem","LinearPert",-1);
     if (crLinear > 0.0) {
       randAmplitude = pin->GetReal("problem", "randAmplitude");
-      XNmax = (int) pin->GetOrAddReal("problem","XNmax",floor(pin->GetReal("mesh", "nx1")/5));
-      YNmax = (int) pin->GetOrAddReal("problem","YNmax",floor(pin->GetReal("mesh", "nx3")/5));
+      XNmax = (int) pin->GetOrAddReal("problem","XNMax",floor(pin->GetReal("mesh", "nx1")/5));
+      YNmax = (int) pin->GetOrAddReal("problem","YNMax",floor(pin->GetReal("mesh", "nx3")/5));
     }
     // std::cout << crEsn << "  "<< crD << std::endl;
   }
@@ -349,16 +349,28 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           Real A = randAmplitude;
           //3D case; sum over these terms
           for (int x=0; x<XNmax; x++){
-            for (int y=0; y<YNmax; y++){
+            if(YNmax==0){
+              // std::cout << "XNMAX IS" << std::endl;
+              // std::cout << XNmax << std::endl;
+              // std::cout << "YNMAX IS" << std::endl;
+              // std::cout << YNmax << std::endl;
               Real Lx = xRange/(x+1); // x;
-              Real Ly = yRange/(y+1); // y;
-              dv += (A / (XNmax*YNmax)) //amplitude scaled
-                    * sin(((2*M_PI*x1) / Lx) - randsX[x])
-                    * sin(((2*M_PI*x3) / Ly) - randsY[y]);
+              dv += (A / (XNmax)) //amplitude scaled
+                    * sin(((2*M_PI*x1) / Lx) - randsX[x]);
+
+            }else{
+              for (int y=0; y<YNmax; y++){
+                Real Lx = xRange/(x+1); // x;
+                Real Ly = yRange/(y+1); // y;
+                dv += (A / (XNmax*YNmax)) //amplitude scaled
+                      * sin(((2*M_PI*x1) / Lx) - randsX[x])
+                      * sin(((2*M_PI*x3) / Ly) - randsY[y]);
+              }
             }
           }
           //change momentum
-          phydro->u(IM2, k, j, i) = dv*density;
+          phydro->u(IM2, k, j, i) += dv*density;
+          phydro->u(IEN, k, j, i) += 0.5*density*SQR(dv);
         }
 
         if(CR_ENABLED){
