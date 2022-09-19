@@ -377,18 +377,20 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           // get CR parameters
           Real crp = beta*pressure; //*(1+ampCR*(1-x2/centerCR));
           Real pertVal = pertProfile(x1,x2,x3);;
-
-          // set CR variables
-          if (crThermal < 0.0) {
-            pcr->u_cr(CRE,k,j,i) = 3.0*crp+pertVal * crD * crEsn;
-          } else {
-            pcr->u_cr(CRE,k,j,i) = 3.0*crp;
-            phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
-          }
-          //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
+          pcr->u_cr(CRE,k,j,i) = 3.0*crp;
           pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
           pcr->u_cr(CRF2,k,j,i) = fcProfile(x1,x2,x3);//-1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
+          // set CR variables
+          if (crEsn > 0.0) {
+            if (crThermal < 0.0) {
+              pcr->u_cr(CRE,k,j,i) += pertVal * crD * crEsn;
+            } else {
+              phydro->u(IEN,k,j,i) += pertVal * crD * crEsn;
+            }
+          }
+          //perturbation coefficient is 2.161118 1e-10 erg/cm^3 / (1e-12 erg/cm^3)
+
         }
         // Setup scalar tracker for flux tubes
         if ((NSCALARS > 0) ) {
