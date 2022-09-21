@@ -151,7 +151,7 @@ Real sigmaParl, sigmaPerp;
 
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
-
+int RefinementCondition(MeshBlock *pmb);
 
 //Implement functions
 Real densProfile(Real x1, Real x2, Real x3)
@@ -299,6 +299,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (pin->GetString("mesh","ox2_bc")=="user")
       EnrollUserCRBoundaryFunction(outer_x2, DiodeCROuterX2);
   }
+  if(adaptive==true)
+      EnrollUserRefinementCondition(RefinementCondition);
 }
 
 //Setup initial mesh and variables
@@ -872,6 +874,32 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
   }
 
   }
+}
+
+//----------------------------------------------------------------------------------------
+int RefinementCondition(MeshBlock *pmb)
+{
+  AthenaArray<Real> &w = pmb->phydro->w;
+  Real maxeps=0.0;
+  for(int k=pmb->ks; k<=pmb->ke; k++) {
+    for(int j=pmb->js; j<=pmb->je; j++) {
+      for(int i=pmb->is; i<=pmb->ie; i++) {
+        Real epsr= ( std::abs(w(IDN,k,j,i+1)-2.0*w(IDN,k,j,i)+w(IDN,k,j,i-1))
+                    +std::abs(w(IDN,k,j+1,i)-2.0*w(IDN,k,j,i)+w(IDN,k,j-1,i))
+                    // +std::abs(w(IDN,k+1,j,i)-2.0*w(IDN,k,j,i)+w(IDN,k-1,j,i))
+                   )/w(IDN,k,j,i);
+        Real epsp= ( std::abs(w(IEN,k,j,i+1)-2.0*w(IEN,k,j,i)+w(IEN,k,j,i-1))
+                    +std::abs(w(IEN,k,j+1,i)-2.0*w(IEN,k,j,i)+w(IEN,k,j-1,i))
+                    // +std::abs(w(IEN,k+1,j,i)-2.0*w(IEN,k,j,i)+w(IEN,k-1,j,i))
+                   )/w(IEN,k,j,i);
+        Real eps = std::max(epsr, epsp);
+        maxeps = std::max(maxeps, eps);
+      }
+    }
+  }
+  if(maxeps > 0.02) return 1;
+  if(maxeps < 0.01) return -1;
+  return 0;
 }
 
 //----------------------------------------------------------------------------------------
