@@ -152,6 +152,7 @@ Real sigmaParl, sigmaPerp;
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
 int RefinementCondition(MeshBlock *pmb);
+Real epsRefine, epsDeRefine;
 
 //Implement functions
 Real densProfile(Real x1, Real x2, Real x3)
@@ -299,8 +300,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     if (pin->GetString("mesh","ox2_bc")=="user")
       EnrollUserCRBoundaryFunction(outer_x2, DiodeCROuterX2);
   }
-  if(adaptive==true)
+  if(adaptive==true) {
       EnrollUserRefinementCondition(RefinementCondition);
+      epsRefine = pin->GetOrAddReal("problem","epsRefine",0.01);
+      epsDeRefine = pin->GetOrAddReal("problem","epsDeRefine",0.005);
+  }
 }
 
 //Setup initial mesh and variables
@@ -881,6 +885,7 @@ int RefinementCondition(MeshBlock *pmb)
 {
   AthenaArray<Real> &w = pmb->phydro->w;
   Real maxeps=0.0;
+
   for(int k=pmb->ks; k<=pmb->ke; k++) {
     for(int j=pmb->js; j<=pmb->je; j++) {
       for(int i=pmb->is; i<=pmb->ie; i++) {
@@ -897,8 +902,8 @@ int RefinementCondition(MeshBlock *pmb)
       }
     }
   }
-  if(maxeps > 0.02) return 1;
-  if(maxeps < 0.01) return -1;
+  if(maxeps > epsRefine) return 1;
+  if(maxeps < epsDeRefine) return -1;
   return 0;
 }
 
