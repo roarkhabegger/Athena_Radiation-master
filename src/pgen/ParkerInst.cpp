@@ -83,6 +83,12 @@ Real crD; // percentage of SN energy in CRs - in multiples of 10%
 Real crEsn; // energy of SN in units of 1e51 erg
 Real crPertRad; // radius of supernova expansion (width of gaussian profile)
                 // in units of 10pc
+Real cloud;
+Real cloudDist;
+Real cloudRad;
+Real cloudDens;
+Real cloudPres;
+
 Real crThermal;
 Real crLinear;
 Real randAmplitude;
@@ -109,6 +115,7 @@ Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
 Real gravProfile(Real x1, Real x2, Real x3);
 Real potProfile(Real x1, Real x2, Real x3);
+Real cloudProfile(Real x1, Real x2, Real x3);
 // Real pertProfile(Real x1, Real x2, Real x3);
 Real fcProfile(Real x1, Real x2, Real x3);
 Real s1Profile(Real x1, Real x2, Real x3);
@@ -185,6 +192,16 @@ Real pertProfile(Real x1, Real x2, Real x3)
   return p;
   //Coefficient is (100pc)^2/200 pc^2
 }
+Real cloudProfile(Real x1, Real x2, Real x3)
+{
+  Real cZ = crPertCenterZ;
+  Real cY = crPertCenterY;
+  Real cX = crPertCenterX + 0.5*cloudDist;
+  Real dist = pow(SQR(x1-cX)+SQR(x2-cZ)+SQR(x3-cY),0.5);
+  Real p = 1e3*exp(-50.0*SQR(dist/cloudRad))/pow(2*M_PI*SQR(cloudRad),1.5);
+  return p;
+  //Coefficient is (100pc)^2/200 pc^2
+}
 Real fcProfile(Real x1, Real x2, Real x3)
 {
   Real  fcz = pow(cosh(x2/(nGrav*h)),-1.0*nGrav)*tanh(x2/(nGrav*h));
@@ -246,6 +263,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
 
+  cloud = pin->GetOrAddReal("problem","cloud",-1);
+  if (cloud > 0.0) {
+    cloudDist = pin->GetOrAddReal("problem","cloudDist",0);
+    cloudRad = pin->GetOrAddReal("problem","cloudRad",0);
+    cloudDens = pin->GetOrAddReal("problem","cloudDens",0);
+    cloudPres = pin->GetOrAddReal("problem","cloudPres",0);
+  }
+
   if(CR_ENABLED){
     //Load CR Variables
     crPertCenterX = pin->GetReal("problem","pertX");
@@ -256,6 +281,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
     crEsn = pin->GetReal("problem","snEner");
     crD = pin->GetReal("problem","snEnerFrac");
     crPertRad = pin->GetReal("problem","pertR");
+
     crThermal = pin->GetOrAddReal("problem","ThermalBlast",-1);
     crLinear = pin->GetOrAddReal("problem","LinearPert",-1);
     if (crLinear > 0.0) {
@@ -342,12 +368,21 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         // Real pot = potProfile(x1,x2,x3)*density;
 
         //set hydro variables
-        phydro->u(IDN,k,j,i) = density;
-        phydro->u(IM1,k,j,i) = vx*density;
-        phydro->u(IM2,k,j,i) = 0.0;
-        phydro->u(IM3,k,j,i) = 0.0;
-        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx) ;//+ pot;
+        if (cloud > 0.0) {
+          Real myCloud = cloudProfile(x1,x2,x3) + cloudProfile(-1*x1,x2,x3);
+          phydro->u(IDN,k,j,i) = density + cloudDens*dens0*myCloud;
+          phydro->u(IM1,k,j,i) = vx*density;
+          phydro->u(IM2,k,j,i) = 0.0;
+          phydro->u(IM3,k,j,i) = 0.0;
+          phydro->u(IEN,k,j,i) = (pressure + cloudPres*pres0*myCloud)/(myGamma-1)+ 0.5*density*SQR(vx);
+        } else {
+          phydro->u(IDN,k,j,i) = density;
+          phydro->u(IM1,k,j,i) = vx*density;
+          phydro->u(IM2,k,j,i) = 0.0;
+          phydro->u(IM3,k,j,i) = 0.0;
+          phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx) ;//+ pot;
 
+        }
         //FROM Sherry's ParkerInst_Perturb
         if(crLinear > 0.0){
           //set perturbations in z (vertical) velocities
