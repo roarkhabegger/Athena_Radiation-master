@@ -1,10 +1,11 @@
 python3 configure.py \
- --prob=ParkerInst \
- --nghost=2 \
- --nscalars=2 \
+ --prob=MultiPhase \
+ --nghost=3 \
  -b \
+ -fft \
  -cr \
  -hdf5 \
+ -h5double \
  -mpi \
  --mpiccmd='/opt/usr/local/bin/mpicxx' \
  --include='/opt/usr/local' \
