@@ -105,17 +105,21 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   const int Nz = ke - ks + 1;
   //read input parameters
   const Real nH = pin->GetReal("problem", "nH"); //density
+  const Real iso_cs = pin->GetReal("hydro", "iso_sound_speed");
   const Real vx = pin->GetOrAddReal("problem", "vx", 0); //velocity x
-  const Real b0 = pin->GetOrAddReal("problem","b0",0.0); //mean field strength
+  
+  const Real mA = pin->GetOrAddReal("problem","mA",0.0);
+  const Real b0 = mA*iso_cs*sqrt(nH); //mean field strength
   const Real angle = (PI/180.0)*pin->GetOrAddReal("problem","angle",0.0);
   const Real G0 = pin->GetOrAddReal("problem", "G0", 0.);
 
   const Real s_init = pin->GetOrAddReal("problem", "s_init", 0.);
   //mean and std of the initial gaussian profile
-  const Real iso_cs = pin->GetReal("hydro", "iso_sound_speed");
+  
   const Real pres = nH*SQR(iso_cs);
   const Real gm1  = peos->GetGamma() - 1.0;
-  const Real crpres = pin->GetOrAddReal("problem","crpres",0.0);
+  const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
+  const Real crpres = pres*invbetaCR;
 
   const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
   const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
@@ -224,7 +228,8 @@ void MeshBlock::UserWorkInLoop() {
         nH     = phydro->u(IDN,k,j,i)*unit_density_in_nH_;
         e      = phydro->w(IPR,k,j,i)/(g-1.0);
         E_ergs = e* unit_E_in_cgs_ / nH;
-        T      = E_ergs / (1.5*kb);
+        // T      = E_ergs / (1.5*kb); //Why forced to be gamma=5/3 with 1.5 = 1/(g-1)
+		T      = E_ergs*(g-1) / kb;
         T      = (T > T_floor) ? T : T_floor;
         T_next = AdaptiveODESolver(T,nH,dt);
         //std::cout<<"T = "<<T<<"T_next = "<<T_next<<std::endl;

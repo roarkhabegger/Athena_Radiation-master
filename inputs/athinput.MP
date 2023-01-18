@@ -21,7 +21,7 @@ dt         = 5.0        # time increment between outputs
 
 <time>
 cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
-nlim       = -1 # 10000000   # cycle limit
+nlim       = 1 # 10000000   # cycle limit
 tlim       = 5.0 # 100.0      # time limit
 integrator  = vl2       # time integration algorithm
 xorder      = 2         # order of spatial reconstruction
@@ -53,30 +53,30 @@ nx3        = 16
 
 <hydro>
 gamma           = 1.666666666667 # gamma = C_p/C_v
-iso_sound_speed = 3.66           # equavalent to sqrt(gamma*p/d) for p=0.1, d=1 (From examples) (unit: km s^-1)
+iso_sound_speed = 1.57363272           # equavalent to sqrt(gamma*p/d) for p=0.1, d=1 (From examples) (unit: km s^-1)
 
 <cr>
-vmax             =  3.06601394e3
-sigmaPerp = 3.08354289e4
-sigmaParl = 3.08354289e-1
+vmax             =2.99792458e5
+sigmaPerp = 2.99792458e1
+sigmaParl = 2.99792458e1
 src_flag = 1
 vs_flag = 1
 
 <problem>
 turb_flag  = 3        # 2  )1 for decaying, 2 (impulsive) or 3 (continuous) for driven turbulence
-b0         = 3.0      # The B-field stregth (Unit 0.183 \mu G)
+mA         = 5.0      # The B-field stregth (Unit 0.183 \mu G)
 angle      = 0.0      # The B-field angle to y-direction
 nH         = 3.0      # The density of each pixel (Unit: mH cm^-3)
-crpres     = 40.0
+invbetaCR  = 0.2
 vx         = 0.0      # The rms of velocity
 
 s_init_H   = 1;       # H+ aboundance per H
 s_init_H2  = 0;       # H+ aboundance per H
 
-nH_c       = 30.0
-b0_c       = 30.0
-pres_c     = 1.0
-crpres_c   = 1.0
+nH_c       = 4.0
+b0_c       = 13.6280591
+pres_c     = 7.42895978
+crpres_c   = 1.48579196
 rad_c      = 20.0
 wid_c      = 0.1
 

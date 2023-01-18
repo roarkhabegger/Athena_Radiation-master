@@ -11,6 +11,7 @@
 // C++ headers
 #include <algorithm>  // std::sort()
 #include <cstdint>
+#include <limits>
 #include <iostream>
 #include <sstream>
 
