@@ -70,6 +70,7 @@ nH         = 3.0      # The density of each pixel (Unit: mH cm^-3)
 invbetaCR  = 0.2
 vx         = 0.0      # The rms of velocity
 
+cooling    =1
 s_init_H   = 1;       # H+ aboundance per H
 s_init_H2  = 0;       # H+ aboundance per H
 
