@@ -41,6 +41,7 @@ Real Cooling(Real T, Real nH);
 Real dTdt(Real T, Real nH);
 Real AdaptiveODESolver(Real T, Real nH, Real dt);
 Real CoolingTimeStep(MeshBlock *pmb);
+int cooling_flag;
 const Real T_floor = 50;
 
 Real sigmaParl, sigmaPerp; //CR diffusion 
@@ -75,8 +76,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
   }
-
-  EnrollUserTimeStepFunction(CoolingTimeStep);
+  cooling_flag = pin->GetInteger("problem","cooling");
+  if (cooling_flag != 0) {
+	EnrollUserTimeStepFunction(CoolingTimeStep);
+  }
   // turb_flag is initialzed in the Mesh constructor to 0 by default;
   // turb_flag = 1 for decaying turbulence
   // turb_flag = 2 for driven turbulence
@@ -220,7 +223,7 @@ void MeshBlock::UserWorkInLoop() {
   Real dt = pmy_mesh->dt*unit_time_in_s_;
   Real g = peos->GetGamma(); //Gamma
   Real nH,e,E_ergs,T,T_next,e_next;
-
+  if (cooling_flag != 0) {
   for (int k=ks-NGHOST; k<=ke+NGHOST; ++k) {
     for (int j=js-NGHOST; j<=je+NGHOST; ++j) {
 #pragma omp simd
@@ -242,6 +245,7 @@ void MeshBlock::UserWorkInLoop() {
         phydro->w(IEN,k,j,i) += (e_next-e); 
       }
     }
+  }
   }
 }
 
