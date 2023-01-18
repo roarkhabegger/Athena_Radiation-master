@@ -109,18 +109,19 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   //read input parameters
   const Real nH = pin->GetReal("problem", "nH"); //density
   const Real iso_cs = pin->GetReal("hydro", "iso_sound_speed");
+  const Real pres = nH*SQR(iso_cs);
+  const Real gm1  = peos->GetGamma() - 1.0;
+  
   const Real vx = pin->GetOrAddReal("problem", "vx", 0); //velocity x
   
-  const Real mA = pin->GetOrAddReal("problem","mA",0.0);
-  const Real b0 = mA*iso_cs*sqrt(nH); //mean field strength
+  const Real invbeta = pin->GetOrAddReal("problem","invbeta",0.0);
+  const Real b0 = sqrt(2*invbeta*pres); //mean field strength
   const Real angle = (PI/180.0)*pin->GetOrAddReal("problem","angle",0.0);
   const Real G0 = pin->GetOrAddReal("problem", "G0", 0.);
 
   const Real s_init = pin->GetOrAddReal("problem", "s_init", 0.);
   //mean and std of the initial gaussian profile
   
-  const Real pres = nH*SQR(iso_cs);
-  const Real gm1  = peos->GetGamma() - 1.0;
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
 

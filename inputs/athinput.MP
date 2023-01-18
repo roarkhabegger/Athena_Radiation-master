@@ -64,18 +64,18 @@ vs_flag = 1
 
 <problem>
 turb_flag  = 3        # 2  )1 for decaying, 2 (impulsive) or 3 (continuous) for driven turbulence
-mA         = 5.0      # The B-field stregth (Unit 0.183 \mu G)
-angle      = 0.0      # The B-field angle to y-direction
 nH         = 3.0      # The density of each pixel (Unit: mH cm^-3)
-invbetaCR  = 0.2
+invbeta    = 0.2      # inverse of Plasma beta (B^2/(2P))
+angle      = 0.0      # The B-field angle to y-direction
+invbetaCR  = 0.2      # inverse of CR beta (P_C/P)
 vx         = 0.0      # The rms of velocity
 
-cooling    =1
-s_init_H   = 1;       # H+ aboundance per H
-s_init_H2  = 0;       # H+ aboundance per H
+cooling    = 1
+s_init_H   = 1       # H+ aboundance per H
+s_init_H2  = 0       # H+ aboundance per H
 
-nH_c       = 4.0
-b0_c       = 13.6280591
+nH_c       = 3.0
+b0_c       = 1.72382827 
 pres_c     = 7.42895978
 crpres_c   = 1.48579196
 rad_c      = 20.0
