@@ -13,7 +13,7 @@ dt         = 0.001       # time increment between outputs
 <output2>
 file_type  = hdf5        # Binary data dump
 variable   = prim        # variables to be output
-dt         = 1.0         # time increment between outputs
+dt         = 0.1         # time increment between outputs
 
 <output3>
 file_type  = rst         # History data dump
@@ -21,26 +21,26 @@ dt         = 5.0        # time increment between outputs
 
 <time>
 cfl_number = 0.3        # The Courant, Friedrichs, & Lewy (CFL) Number
-nlim       = 1 # 10000000   # cycle limit
+nlim       = -1 # 10000000   # cycle limit
 tlim       = 5.0 # 100.0      # time limit
 integrator  = vl2       # time integration algorithm
 xorder      = 2         # order of spatial reconstruction
-ncycle_out  = 1         # interval for stdout summary info
+ncycle_out  = 100         # interval for stdout summary info
 
 <mesh>
-nx1        = 32         # Number of zones in X1-direction
+nx1        = 128         # Number of zones in X1-direction
 x1min      = -100.0     # minimum value of X1
 x1max      = 100.0      # maximum value of X1 (unit: pc)
 ix1_bc     = periodic   # inner-X1 boundary flag
 ox1_bc     = periodic   # outer-X1 boundary flag
 
-nx2        = 32         # Number of zones in X2-direction
+nx2        = 128       # Number of zones in X2-direction
 x2min      = -100.0     # minimum value of X2
 x2max      = 100.0      # maximum value of X2 (unit: pc)
 ix2_bc     = periodic   # inner-X2 boundary flag
 ox2_bc     = periodic   # outer-X2 boundary flag
 
-nx3        = 32         # Number of zones in X3-direction
+nx3        = 128         # Number of zones in X3-direction
 x3min      = -100.0     # minimum value of X3
 x3max      = 100.0      # maximum value of X3 (unit: pc)
 ix3_bc     = periodic   # inner-X3 boundary flag
@@ -56,9 +56,9 @@ gamma           = 1.666666666667 # gamma = C_p/C_v
 iso_sound_speed = 1.57363272           # equavalent to sqrt(gamma*p/d) for p=0.1, d=1 (From examples) (unit: km s^-1)
 
 <cr>
-vmax             =2.99792458e5
-sigmaPerp = 2.99792458e1
-sigmaParl = 2.99792458e1
+vmax      = 2.99792458e3
+sigmaPerp = 2.99792458e-1
+sigmaParl = 2.99792458e-1
 src_flag = 1
 vs_flag = 1
 
@@ -70,16 +70,16 @@ angle      = 0.0      # The B-field angle to y-direction
 invbetaCR  = 0.2      # inverse of CR beta (P_C/P)
 vx         = 0.0      # The rms of velocity
 
-cooling    = 1
+cooling    = 0
 s_init_H   = 1       # H+ aboundance per H
 s_init_H2  = 0       # H+ aboundance per H
 
-nH_c       = 3.0
-b0_c       = 1.72382827 
-pres_c     = 7.42895978
-crpres_c   = 1.48579196
-rad_c      = 20.0
-wid_c      = 0.1
+#nH_c       = 3.0
+#b0_c       = 1.72382827 
+#pres_c     = 7.42895978
+#crpres_c   = 1.48579196
+#rad_c      = 20.0
+#wid_c      = 0.1
 
 # Note in CR Athena implementation turbulence parameters fall in problem block
 dedt       = 1e7      # 200 )Energy injection rate (for driven) or Total energy (for decaying)
