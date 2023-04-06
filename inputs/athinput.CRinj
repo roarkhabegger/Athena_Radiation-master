@@ -1,0 +1,84 @@
+<comment>
+problem   = Parker Instability from CR injection
+reference =
+configure = --prob=CRInj
+
+<job>
+problem_id = crinj        # problem ID: basename of output filenames
+
+<output1>
+file_type  = hdf5       # Binary data dump
+dt         = 1.02271217e-1   # time increment between outputs
+variable   = prim
+
+<output2>
+file_type  = rst       # Binary data dump
+dt         = 1.02271217e1   # time increment between outputs
+
+<output3>
+file_type  = hst       # Binary data dump
+dt         = 1e-2   # time increment between outputs
+
+<time>
+cfl_number = 0.2      # The Courant, Friedrichs, & Lewy (CFL) Number
+integrator = rk3
+nlim       = -1 # cycle limit
+tlim       = 30.681365    # time limit
+ncycle_out = 1000
+
+<mesh>
+nx1        = 200    # Number of zones in X1-direction
+x1min      = -10    # minimum value of X1
+x1max      = 10    # maximum value of X1
+ix1_bc     = outflow  # inner-X1 boundary flag
+ox1_bc     = outflow        # inner-X1 boundary flag
+
+x2rat      = 1
+nx2        = 300  # Number of zones in X2-direction
+x2min      = -10    # minimum value of X2
+x2max      = 20    # maximum value of X2
+ix2_bc     = user   # inner-X2 boundary flag
+ox2_bc     = user # inner-X2 boundary flag
+
+# above has resolution of 31.25 pc
+
+
+nx3        = 200      # Number of zones in X3-direction
+x3min      = -10    # minimum value of X3
+x3max      = 10      # maximum value of X3
+ix3_bc     = outflow # inner-X3 boundary flag
+ox3_bc     = outflow  # inner-X3 boundary flag
+
+
+<meshblock>
+nx1 = 25
+nx2 = 15
+nx3 = 25
+
+
+
+<hydro>
+gamma           = 1.6666666666667       # gamma = C_p/C_v
+#iso_sound_speed = 1.0
+pfloor = 1e-10
+dfloor = 1e-10 #Might need to change this
+
+
+<cr>
+vmax = 8.99377374e3
+sigmaPerp = 9.25062867e5
+sigmaParl = 9.25062867e1
+src_flag = 1
+vs_flag = 1
+
+
+<problem>
+  xVel = 0.0
+  Dens = 1.0
+  GravNumScaleHeight = 4.11423678e-1
+  Pres = 1.0
+  Grav = 1.23427103
+  ScaleH = 2.43058447e0
+
+  alpha = 1.9
+  beta = 0.1
