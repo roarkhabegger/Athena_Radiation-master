@@ -24,6 +24,8 @@
 #include <cmath>      // sqrt
 #include <cfloat>      // FLT_MAX
 #include <algorithm>  // min
+#include <random> 
+#include <vector>
 
 // Athena++ headers
 #include "../globals.hpp"
@@ -77,23 +79,28 @@ const Real float_min{std::numeric_limits<float>::min()};
 
 //Cooling and perturbation scalar
 int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
-
-//Perturbation Array
-const int Ninjs = 10;
-
-Real injE[Ninjs] = { };
-Real injR[Ninjs] = { };
-Real injTr[Ninjs] = { };
-Real injTf[Ninjs] = { };
-Real injT[Ninjs] = { };
-Real injX1[Ninjs] = { };
-Real injX2[Ninjs] = { };
-Real injX3[Ninjs] = { };
+std::vector<double> X1Inj = {};
+std::vector<double> X2Inj = {};
+std::vector<double> X3Inj = {};
+int NInjs = 0;
+int TotalInjs = 0;
+double lastInjT = 0.0;
+double SNRate = 0.0;
+double Esn = 0.0;
+// std::vector<float> injE  = { };
+// std::vector<float> injTr = { };
+// std::vector<float> injTf = { };
+// std::vector<float> injT  = { };
+// std::vector<float> injX1 = { };
+// std::vector<float> injX2 = { };
+// std::vector<float> injX3 = { };
 
 
 //Profile functions
 Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
+Real fcProfile(Real x1, Real x2, Real x3);
+
 
 //Gravity function tanh, and cooling
 void mySource(MeshBlock *pmb, const Real time, const Real dt,
@@ -140,6 +147,13 @@ Real presProfile(Real x1, Real x2, Real x3)
   return pres;
 }
 
+Real fcProfile(Real x1, Real x2, Real x3)
+{
+  Real  fcz = pow(cosh(x2/(nGrav*h)),-1.0*nGrav)*tanh(x2/(nGrav*h));
+  fcz *= beta*pres0/(h*sigmaPerp) ;
+  return fcz;
+}
+
 // Set local (each cell independently) opacity funciton
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
@@ -149,9 +163,68 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
   }
 }
 
-//Set up initial MESH data
-void Mesh::InitUserMeshData(ParameterInput *pin)
+
+
+//----------------------------------------------------------------------------------------
+void Mesh::UserWorkAfterLoop(ParameterInput *pin) {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank==0) {
+    std::cout << "Total Number of Injections = " << TotalInjs << std::endl;
+  }
+}
+
+//----------------------------------------------------------------------------------------
+void Mesh::UserWorkInLoop(void)
 {
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  X1Inj.clear();
+  X2Inj.clear();
+  X3Inj.clear();
+  NInjs = 0;
+  if (rank == 0) {
+    Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
+    Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
+    Real x3d = (mesh_size.x3max - mesh_size.x3min)/float(mesh_size.nx3);;
+    //std::cout << mesh_size.x1min << "," << mesh_size.x1max << std::endl;
+
+    std::exponential_distribution<double> distDt(SNRate);
+    std::uniform_real_distribution<double> distx1(mesh_size.x1min,mesh_size.x1max);
+    std::uniform_real_distribution<double> distx2(-0.1,0.1);
+    std::uniform_real_distribution<double> distx3(mesh_size.x3min,mesh_size.x3max);
+
+    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine gen(seed1);
+
+    while (lastInjT < time+dt) {
+      X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
+      X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
+      X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
+      lastInjT += distDt(gen);
+      NInjs +=1;
+    }
+    //std::cout << time << " " << NInjs <<std::endl;
+  } 
+  
+  MPI_Bcast(&lastInjT,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Bcast(&NInjs,1,MPI_INT,0,MPI_COMM_WORLD);
+
+  if ((NInjs > 0) && (rank != 0)){
+    X1Inj.insert(X1Inj.end(),NInjs,-15.0);
+    X2Inj.insert(X2Inj.end(),NInjs,-15.0);
+    X3Inj.insert(X3Inj.end(),NInjs,-15.0);
+  }
+
+  MPI_Bcast(&X1Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Bcast(&X2Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  MPI_Bcast(&X3Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  TotalInjs += NInjs;
+}
+
+
+//Set up initial MESH data
+void Mesh::InitUserMeshData(ParameterInput *pin) {
   myGamma = pin->GetReal("hydro","gamma");
 
   // Load variables
@@ -166,38 +239,18 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 
   g0 =pin->GetReal("problem","Grav");
   h  =pin->GetReal("problem","ScaleH");
-
+  
   dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
   pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
-
+  
   if(CR_ENABLED){
     //Load CR Variables 
+    sigmaPerp = pin->GetReal("cr","sigmaPerp");
+    sigmaParl = pin->GetReal("cr","sigmaParl");
+    SNRate = pin->GetReal("problem","SNRate");
+    Esn = pin->GetOrAddReal("problem","Esn",2.12842045e-7);
     //.        Esn, Rad, tRise, tFall, t0, x10, x20, x30 
-    Real x1Max = 0.5*(pin->GetReal("mesh","x1max"));
-    Real x1Min = 0.5*(pin->GetReal("mesh","x1min"));
-    Real x2Max = 0.1;//pin->GetReal("mesh","x2max");
-    Real x2Min = 0.1;pin->GetReal("mesh","x2min");
-    Real x3Max = 0.5*(pin->GetReal("mesh","x3max"));
-    Real x3Min = 0.5*(pin->GetReal("mesh","x3min"));
-    std::default_random_engine gen;
-    std::uniform_real_distribution<double> distx1(x1Min,x1Max);
-    std::uniform_real_distribution<double> distx2(x2Min,x2Max);
-    std::uniform_real_distribution<double> distx3(x3Min,x3Max);
-      
-    for (int m=0; m < Ninjs; ++m) {
-        injE[m] = 300.0;
-        injR[m] = 0.01;
-        injTr[m] = 0.01;
-        injTf[m] = 1.0;
-        injT[m] = 1.0;
-        injX1[m] = distx1(gen);
-        injX2[m] = distx2(gen);
-        injX3[m] = distx3(gen);
-    }
-    // std::cout << crEsn << "  "<< crD << std::endl;
-  }
-
-
+  }  
   // MHD boundary conditions
   if (pin->GetString("mesh","ix2_bc")=="user"){
     EnrollUserBoundaryFunction(inner_x2, DiodeInnerX2);
@@ -224,9 +277,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 //Setup initial mesh and variables
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
-  // Derived variables
-  //H = pres0/(dens0*g0)*(1+alpha+beta); // H ==1 always if length scale is H
-  // Initialize hydro variable
   for(int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
@@ -246,8 +296,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
           // get CR parameters
           Real crp = beta*pressure;
           pcr->u_cr(CRE,k,j,i) = 3.0*crp;
-          pcr->u_cr(CRF1,k,j,i) = vx*4.0*crp;
-          pcr->u_cr(CRF2,k,j,i) = 0.0;//-1.0*dPcdz/sigmaParl;
+          pcr->u_cr(CRF1,k,j,i) = 0.0;
+          pcr->u_cr(CRF2,k,j,i) = fcProfile(x1,x2,x3);//-1.0*dPcdz/sigmaParl;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
         }
       }// end i
@@ -332,34 +382,39 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 void CRSource(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &u_cr)
-{ 
-  for (int m=0; m < Ninjs; ++m) {
+{   // int rank;
+    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    // std::cout << time << " " << NInjs <<std::endl;
+    // if (NInjs == 1) {std::cout << time << " Node " << rank << " has X1=" << X1Inj.at(0) << std::endl;}
+  
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
   #pragma omp simd
       for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real x2 = pmb->pcoord->x2v(j);
-        Real x1 = pmb->pcoord->x1v(i);
-        Real x3 = pmb->pcoord->x3v(k);
-          
-        Real Esn   = injE[m];
-        Real Rad   = injR[m];
-        Real tRise = injTr[m];
-        Real tFall = injTf[m];
-        Real t0    = injT[m]; 
-        Real x10   = injX1[m];
-        Real x20   = injX2[m];
-        Real x30   = injX3[m];
-        
-        Real dist = pow(SQR(x1-x10)+SQR(x2-x20)+SQR(x3-x30),0.5);
-        Real pt= (1 - exp(-1*(time-t0)/tRise))*exp(-1*(time-t0)/tFall) / (tFall/(1+tRise/tFall) );
-        Real px = exp(-0.5*SQR(dist/Rad)) / pow(2*M_PI*SQR(Rad),1.5) ;
-        u_cr(CRE,k,j,i) += px * pt ;
-
+        //HSE forcing
+        Real xi = pmb->pcoord->x2v(j)/(nGrav*h);
+        Real arg = (1/(nGrav*SQR(cosh(xi))) - SQR(tanh(xi)))*pow(cosh(xi),-1.0*nGrav);
+        Real coeff = (beta* pres0)/ (sigmaPerp*SQR(h));
+        u_cr(CRE,k,j,i) += arg*coeff*dt;
+        for (int m = 0 ; m < NInjs; ++m) {
+          Real x1fl = pmb->pcoord->x1f(i);
+          Real x2fl = pmb->pcoord->x2f(j);
+          Real x3fl = pmb->pcoord->x3f(k);
+          Real x1fr = pmb->pcoord->x1f(i+1);
+          Real x2fr = pmb->pcoord->x2f(j+1);
+          Real x3fr = pmb->pcoord->x3f(k+1);
+          Real vol = (x1fr-x1fl)*(x2fr-x2fl)*(x3fr-x3fl);
+          Real x10   = X1Inj.at(m);
+          Real x20   = X2Inj.at(m);
+          Real x30   = X3Inj.at(m);
+          if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
+          // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
+            u_cr(CRE,k,j,i) += Esn/vol;
+          }
         }
       }
     }
-    }
+  }
 
   return;
 }
@@ -368,12 +423,18 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
   const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &cons)
 {
-  Real T0 = 9.773;
-  Real T1 = 0.1238;
-  Real T2 = 0.007594;
-  Real A = 651790.0;
-  Real B = 0.705;
-  Real C = 3.0;
+  Real T0  =  2.59008249e-6 ;
+  Real T1  =  1.72672166e-5 ;
+  Real T2  =  6.90688664e-5 ;
+  Real T3  =  8.63360831e-4 ;
+  Real T4  =  3.45344332e-1 ;
+  Real A1  =  4.41644786e-11 ;
+  Real A2  =  1.97575854e-9 ;
+  Real A3  =  9.12495752e-15 ;
+  Real A4  =  3.51263503e3 ;
+  Real A5  =  6.35767207e-6 ;
+
+  Real Heat = 0.0;
 
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
@@ -393,7 +454,20 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
         if (cooling == 1) {
           Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
           Real n = prim(IDN,k,j,i);
-          cons(IEN,k,j,i) -= pow(n,2.0)*(A*exp(-1*T0/(temp-T1))+B*exp(-1*T2/temp))-n*C;
+          Real Lamb = 0.0;
+          // if ((temp >= T0) && (temp <= T1)) { 
+          //   Lamb = A1 * pow(T,2.0);
+          // } else if ((temp >= T1) && (temp <= T2)){
+          //   Lamb = A2 * pow(T,1.5);
+          // } else if ((temp >= T2) && (temp <= T3)){
+          //   Lamb = A3 * pow(T,2.867);
+          // } else if ((temp >= T3) && (temp <= T4)){
+          //   Lamb = A4 * pow(T,-0.65);
+          // } else if ((temp >= T4) ){
+          //   Lamb = A5 * pow(T,0.5);
+          // }
+          Lamb = 1e-2;
+          cons(IEN,k,j,i) -= dt*(pow(n,2.0)*Lamb-n*Heat);
         }
       }
     }
@@ -744,11 +818,4 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
   }
 
   }
-}
-
-//----------------------------------------------------------------------------------------
-void Mesh::UserWorkInLoop(void)
-{
-
-
 }
