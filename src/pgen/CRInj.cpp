@@ -26,6 +26,7 @@
 #include <algorithm>  // min
 #include <random> 
 #include <vector>
+#include <chrono>
 
 // Athena++ headers
 #include "../globals.hpp"
@@ -197,7 +198,7 @@ void Mesh::UserWorkInLoop(void)
     unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine gen(seed1);
 
-    while (lastInjT < time+dt) {
+    while ((lastInjT < time+dt) && (SNRate> 0.0)){
       X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
       X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
       X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
