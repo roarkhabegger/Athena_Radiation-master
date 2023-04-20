@@ -205,6 +205,9 @@ void Mesh::UserWorkInLoop(void)
       lastInjT += distDt(gen);
       NInjs +=1;
     }
+    if  (SNRate <= 0.0) {
+        lastInjT = time + dt;
+    }
     //std::cout << time << " " << NInjs <<std::endl;
   } 
   
@@ -456,18 +459,18 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
           Real n = prim(IDN,k,j,i);
           Real Lamb = 0.0;
-          // if ((temp >= T0) && (temp <= T1)) { 
-          //   Lamb = A1 * pow(T,2.0);
-          // } else if ((temp >= T1) && (temp <= T2)){
-          //   Lamb = A2 * pow(T,1.5);
-          // } else if ((temp >= T2) && (temp <= T3)){
-          //   Lamb = A3 * pow(T,2.867);
-          // } else if ((temp >= T3) && (temp <= T4)){
-          //   Lamb = A4 * pow(T,-0.65);
-          // } else if ((temp >= T4) ){
-          //   Lamb = A5 * pow(T,0.5);
-          // }
-          Lamb = 1e-2;
+          if ((temp >= T0) && (temp < T1)) { 
+            Lamb = A1 * pow(temp,2.0);
+          } else if ((temp >= T1) && (temp < T2)){
+            Lamb = A2 * pow(temp,1.5);
+          } else if ((temp >= T2) && (temp < T3)){
+            Lamb = A3 * pow(temp,2.867);
+          } else if ((temp >= T3) && (temp < T4)){
+            Lamb = A4 * pow(temp,-0.65);
+          } else if ((temp >= T4) ){
+            Lamb = A5 * pow(temp,0.5);
+          }
+          // Lamb = 1e-2;
           cons(IEN,k,j,i) -= dt*(pow(n,2.0)*Lamb-n*Heat);
         }
       }
