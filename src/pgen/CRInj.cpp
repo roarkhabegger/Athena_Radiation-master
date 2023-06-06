@@ -56,7 +56,7 @@
 //     Length scale is H = P_0/(rho_0 g_0) (1+ alpha + beta)
 //
 //Hydrostatic Equilibrium variables
-Real dens0, pres0, g0, vx, myGamma; // Initial hydro quantities
+Real dens0, pres0, g0, myGamma; // Initial hydro quantities
                        // dens0 in multiples of 1e-24 g/cm^3
                        // pres0 in multiples of 1e-12 erg/cm^3
                        // g0 = (1+alpha + beta)*pres0/dens0
@@ -81,6 +81,7 @@ const Real float_min{std::numeric_limits<float>::min()};
 //Cooling and perturbation scalar
 int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
 int HSE_CR_Forcing;
+int HSE_Gamma;
 
 
 std::vector<double> X1Inj = {};
@@ -90,7 +91,9 @@ int NInjs = 0;
 int TotalInjs = 0;
 // double lastInjT = 0.0;
 double SNRate = 0.0;
+double injH = 0.1;
 double Esn = 0.0;
+double StopT = -1.0;
 // std::vector<float> injE  = { };
 // std::vector<float> injTr = { };
 // std::vector<float> injTf = { };
@@ -99,13 +102,12 @@ double Esn = 0.0;
 // std::vector<float> injX2 = { };
 // std::vector<float> injX3 = { };
 
+Real Heat = 0.0;
 
 //Profile functions
 Real densProfile(Real x1, Real x2, Real x3);
 Real presProfile(Real x1, Real x2, Real x3);
 Real fcProfile(Real x1, Real x2, Real x3);
-Real vxProfile(Real x1, Real x2, Real x3);
-
 
 //Gravity function tanh, and cooling
 void mySource(MeshBlock *pmb, const Real time, const Real dt,
@@ -158,11 +160,7 @@ Real fcProfile(Real x1, Real x2, Real x3)
   fcz *= beta*pres0/(h*sigmaPerp) ;
   return fcz;
 }
-Real vxProfile(Real x1, Real x2, Real x3)
-{
-  Real  vx = sin(M_PI*x1);
-  return vx;
-}
+
 
 // Set local (each cell independently) opacity funciton
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
@@ -193,7 +191,7 @@ void Mesh::UserWorkInLoop(void)
   X2Inj.clear();
   X3Inj.clear();
   NInjs = 0;
-  if (dt < FLT_MAX) {
+  if ((dt < FLT_MAX) && (time < StopT)) {
   if (rank == 0) {
     Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
     Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
@@ -204,7 +202,7 @@ void Mesh::UserWorkInLoop(void)
     std::poisson_distribution<int> distN(SNRate*dt);
 
     std::uniform_real_distribution<double> distx1(mesh_size.x1min,mesh_size.x1max);
-    std::uniform_real_distribution<double> distx2(-0.1,0.1);
+    std::uniform_real_distribution<double> distx2(-1*injH,injH);
     std::uniform_real_distribution<double> distx3(mesh_size.x3min,mesh_size.x3max);
 
     unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
@@ -252,11 +250,10 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   myGamma = pin->GetReal("hydro","gamma");
 
   // Load variables
-  vx=pin->GetReal("problem","xVel");
   nGrav = pin->GetReal("problem","GravNumScaleHeight");
-  beta = pin->GetOrAddReal("problem","beta",0.0);
-  alpha = pin->GetOrAddReal("problem","alpha",0.0);
-  angle = pin->GetOrAddReal("problem","angle",0.0);
+  beta = pin->GetReal("problem","beta");
+  alpha = pin->GetReal("problem","alpha");
+  angle = pin->GetReal("problem","angle");
   pres0 = pin->GetReal("problem","Pres");
 
   dens0 = pin->GetReal("problem","Dens");
@@ -264,15 +261,17 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   g0 =pin->GetReal("problem","Grav");
   h  =pin->GetReal("problem","ScaleH");
   
-  dfloor = pin->GetOrAddReal("hydro", "dfloor", std::sqrt(1024*float_min)) ;
-  pfloor = pin->GetOrAddReal("hydro", "pfloor", std::sqrt(1024*float_min)) ;
+  dfloor = pin->GetReal("hydro", "dfloor") ;
+  pfloor = pin->GetReal("hydro", "pfloor") ;
   
   if(CR_ENABLED){
     //Load CR Variables 
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
     SNRate = pin->GetReal("problem","SNRate");
-    Esn = pin->GetOrAddReal("problem","Esn",2.12842045e-7);
+    injH = pin->GetOrAddReal("problem","InjH",0.1);
+    StopT = pin->GetReal("problem","Stop");
+    Esn = pin->GetOrAddReal("problem","Esn",5.57952651e-02); // CR Energy Density from a Supernova distributed in one cell
     //.        Esn, Rad, tRise, tFall, t0, x10, x20, x30 
   }  
   // MHD boundary conditions
@@ -285,9 +284,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
 
   // Source Functions
   cooling = pin->GetOrAddInteger("problem","cooling",0);
-  HSE_CR_Forcing = pin->GetOrAddInteger("problem","HSE_CR",1);
+  HSE_CR_Forcing = pin->GetOrAddInteger("problem","HSE_CR",0);
+  HSE_Gamma= pin->GetOrAddInteger("problem","HSE_G",0);
   EnrollUserExplicitSourceFunction(mySource);
   
+  Heat =  pin->GetOrAddReal("problem","Heat",2.68059283e-03) ;
 
   if(CR_ENABLED){
     //CR Boundary conditions
@@ -312,10 +313,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real pressure = presProfile(x1,x2,x3);
         
         phydro->u(IDN,k,j,i) = density;
-        phydro->u(IM1,k,j,i) = vx*vxProfile(x1,x2,x3)*density;
+        phydro->u(IM1,k,j,i) = 0.0;
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
-        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) + 0.5*density*SQR(vx*vxProfile(x1,x2,x3)) ;//+ pot;
+        phydro->u(IEN,k,j,i) = pressure/(myGamma-1) ;//+ pot;
 
         if(CR_ENABLED){
           // get CR parameters
@@ -430,19 +431,17 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
           Real x1fr = pmb->pcoord->x1f(i+1);
           Real x2fr = pmb->pcoord->x2f(j+1);
           Real x3fr = pmb->pcoord->x3f(k+1);
-          Real vol = (x1fr-x1fl)*(x2fr-x2fl)*(x3fr-x3fl);
           Real x10   = X1Inj.at(m);
           Real x20   = X2Inj.at(m);
           Real x30   = X3Inj.at(m);
           if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
           // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
-            u_cr(CRE,k,j,i) += Esn/vol;
+            u_cr(CRE,k,j,i) += Esn;
           }
         }
       }
     }
   }
-
   return;
 }
 //Source function with gravity and cooling
@@ -466,8 +465,6 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
   Real a4  = -0.65;
   Real a5  =  0.5;
 
-  Real Heat = 0.0;
-
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
 #pragma omp simd
@@ -487,6 +484,9 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
           Real n = prim(IDN,k,j,i);
           Real Lamb = 0.0;
+          Real Gam = Heat;
+          if (HSE_Gamma == 1) Gam *=  dens0*pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
+
           if ((temp >= T0) && (temp < T1)) { 
             Lamb = A1 * pow(temp,a1);
           } else if ((temp >= T1) && (temp < T2)){
@@ -499,7 +499,7 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
             Lamb = A5 * pow(temp,a5);
           }
           // Lamb = 1e-2;
-          cons(IEN,k,j,i) -= dt*(pow(n,2.0)*Lamb-n*Heat);
+          cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
         }
       }
     }
