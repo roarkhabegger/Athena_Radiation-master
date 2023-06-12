@@ -82,6 +82,7 @@ const Real float_min{std::numeric_limits<float>::min()};
 int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
 int HSE_CR_Forcing;
 int HSE_Gamma;
+int thermal;
 
 
 std::vector<double> X1Inj = {};
@@ -286,9 +287,11 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   cooling = pin->GetOrAddInteger("problem","cooling",0);
   HSE_CR_Forcing = pin->GetOrAddInteger("problem","HSE_CR",0);
   HSE_Gamma= pin->GetOrAddInteger("problem","HSE_G",0);
+  thermal = pin->GetOrAddInteger("problem","thermal",0);
+  Heat =  pin->GetOrAddReal("problem","Heat",2.68059283e-03) ;
   EnrollUserExplicitSourceFunction(mySource);
   
-  Heat =  pin->GetOrAddReal("problem","Heat",2.68059283e-03) ;
+  
 
   if(CR_ENABLED){
     //CR Boundary conditions
@@ -424,19 +427,22 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
           Real coeff = (beta* pres0)/ (sigmaPerp*SQR(h));
           u_cr(CRE,k,j,i) += arg*coeff*dt;
         }
-        for (int m = 0 ; m < NInjs; ++m) {
-          Real x1fl = pmb->pcoord->x1f(i);
-          Real x2fl = pmb->pcoord->x2f(j);
-          Real x3fl = pmb->pcoord->x3f(k);
-          Real x1fr = pmb->pcoord->x1f(i+1);
-          Real x2fr = pmb->pcoord->x2f(j+1);
-          Real x3fr = pmb->pcoord->x3f(k+1);
-          Real x10   = X1Inj.at(m);
-          Real x20   = X2Inj.at(m);
-          Real x30   = X3Inj.at(m);
-          if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
-          // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
-            u_cr(CRE,k,j,i) += Esn;
+        if (thermal==0){
+          for (int m = 0 ; m < NInjs; ++m) {
+            Real x1fl = pmb->pcoord->x1f(i);
+            Real x2fl = pmb->pcoord->x2f(j);
+            Real x3fl = pmb->pcoord->x3f(k);
+            Real x1fr = pmb->pcoord->x1f(i+1);
+            Real x2fr = pmb->pcoord->x2f(j+1);
+            Real x3fr = pmb->pcoord->x3f(k+1);
+            Real Vol = pmb->pcoord->GetCellVolume(k,j,i);
+            Real x10   = X1Inj.at(m);
+            Real x20   = X2Inj.at(m);
+            Real x30   = X3Inj.at(m);
+            if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
+            // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
+              u_cr(CRE,k,j,i) += Esn/Vol;
+            }
           }
         }
       }
@@ -484,8 +490,8 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
           Real n = prim(IDN,k,j,i);
           Real Lamb = 0.0;
-          Real Gam = Heat;
-          if (HSE_Gamma == 1) Gam *=  dens0*pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
+          Real Gam = Heat*dens0;
+          if (HSE_Gamma == 1) Gam *=  pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
 
           if ((temp >= T0) && (temp < T1)) { 
             Lamb = A1 * pow(temp,a1);
@@ -500,6 +506,23 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           }
           // Lamb = 1e-2;
           cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
+        }
+        if (thermal==1){
+          for (int m = 0 ; m < NInjs; ++m) {
+            Real x1fl = pmb->pcoord->x1f(i);
+            Real x2fl = pmb->pcoord->x2f(j);
+            Real x3fl = pmb->pcoord->x3f(k);
+            Real x1fr = pmb->pcoord->x1f(i+1);
+            Real x2fr = pmb->pcoord->x2f(j+1);
+            Real x3fr = pmb->pcoord->x3f(k+1);
+            Real x10   = X1Inj.at(m);
+            Real x20   = X2Inj.at(m);
+            Real x30   = X3Inj.at(m);
+            if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
+            // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
+              cons(IEN,k,j,i) += Esn;
+            }
+          }
         }
       }
     }
