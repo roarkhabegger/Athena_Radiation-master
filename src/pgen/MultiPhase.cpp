@@ -42,14 +42,16 @@ Real dTdt(Real T, Real nH);
 Real AdaptiveODESolver(Real T, Real nH, Real dt);
 Real CoolingTimeStep(MeshBlock *pmb);
 int cooling_flag;
-const Real T_floor = 50;
+const Real T_floor = 50.0;
 
 Real sigmaParl, sigmaPerp; //CR diffusion 
                            //decouple parallel and perpendicular to the local magnetic field
-
+Real crLoss;
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc);
-
+void CRSource(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &u_cr);
 //========================================================================================
 //! \fn void Mesh::InitUserMeshBlockData(ParameterInput *pin)
 //  \brief
@@ -58,6 +60,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   if(CR_ENABLED){
    pcr->EnrollOpacityFunction(Diffusion);
+   pcr->EnrollUserCRSource(CRSource);
   }
 }
 //========================================================================================
@@ -75,6 +78,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     //Load CR Variables
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
+    crLoss = pin->GetOrAddReal("problem","crLoss",0.0);
   }
   cooling_flag = pin->GetInteger("problem","cooling");
   if (cooling_flag != 0) {
@@ -121,14 +125,14 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   const Real s_init = pin->GetOrAddReal("problem", "s_init", 0.);
   //mean and std of the initial gaussian profile
-  
+
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
-
+  const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
+  
   const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
   const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
   const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
-  const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
   const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
   const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
 
@@ -213,7 +217,6 @@ void Mesh::UserWorkAfterLoop(ParameterInput *pin) {
 //  \brief Time-Intregator for adaptive Solver Method Solver
 //========================================================================================
 void MeshBlock::UserWorkInLoop() {
-  const Real T_floor = 30.0;
   const Real kb  = 1.381e-16;
   const Real unit_length_in_cm_  = 3.086e+18;
   const Real unit_vel_in_cms_    = 1.0e5;
@@ -254,7 +257,7 @@ Real Cooling(Real T, Real nH){
   const Real HeatingRate = 2e-26;
   Real CoolingRate = 1e7*std::exp(-1.184e5/(T+1e3))+1.4e-2*std::sqrt(T)*std::exp(-92/T);
   Real dEdt = (T>T_floor)? nH*HeatingRate*(1.0 - nH*CoolingRate) : nH*HeatingRate;
-  return nH*HeatingRate*(1.0 - nH*CoolingRate);
+  return dEdt;
 }
 
 Real dTdt(Real T, Real nH){
@@ -351,6 +354,24 @@ Real CoolingTimeStep(MeshBlock *pmb){
   }
   return min_dt;
 }
+
+
+void CRSource(MeshBlock *pmb, const Real time, const Real dt,
+  const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+  AthenaArray<Real> &u_cr)
+{ 
+  for (int k=pmb->ks; k<=pmb->ke; ++k) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
+  #pragma omp simd
+      for (int i=pmb->is; i<=pmb->ie; ++i) {
+        //CRLoss Term
+        u_cr(CRE,k,j,i) -= crLoss*dt*u_cr(CRE,k,j,i);
+      }
+    }
+  }
+  return;
+}
+
 //----------------------------------------------------------------------------------------
 void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
         AthenaArray<Real> &prim, AthenaArray<Real> &bcc)
