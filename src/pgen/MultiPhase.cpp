@@ -128,15 +128,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
-<<<<<<< HEAD
-  const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
-  
-  const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
-  const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
-  const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
-  const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
-  const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
-=======
 
   // const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
   // const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
@@ -144,7 +135,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   // const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
   // const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
   // const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
->>>>>>> acd801a6a536a7b762c7dfa404cf07dc42988317
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
