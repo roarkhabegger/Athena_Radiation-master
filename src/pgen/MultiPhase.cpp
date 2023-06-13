@@ -128,6 +128,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
+<<<<<<< HEAD
   const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
   
   const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
@@ -135,6 +136,15 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
   const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
   const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
+=======
+
+  // const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
+  // const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
+  // const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
+  // const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
+  // const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
+  // const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
+>>>>>>> acd801a6a536a7b762c7dfa404cf07dc42988317
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -143,21 +153,23 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         Real x1 = pcoord->x1v(i);
         Real x2 = pcoord->x2v(j);
         Real x3 = pcoord->x3v(k);
-        Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
-        phydro->u(IDN, k, j, i) = nH*(1.0 + cloud * (nH_c/nH - 1));
+        //Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
+        phydro->u(IDN, k, j, i) = nH;//*(1.0 + cloud * (nH_c/nH - 1));
         //velocity, x, y, z direction
-        phydro->u(IM1, k, j, i) = nH*(1.0 + cloud * (nH_c/nH - 1))*vx;
+        phydro->u(IM1, k, j, i) = nH*vx;//*(1.0 + cloud * (nH_c/nH - 1));
         phydro->u(IM2, k, j, i) = 0.0;
         phydro->u(IM3, k, j, i) = 0.0;
         //energy
         if (NON_BAROTROPIC_EOS) {
-          phydro->u(IEN, k, j, i) = pres*(1.0 + cloud * (pres_c/pres-1))/gm1 + 0.5*nH*(1.0 + cloud * (nH_c/nH - 1))*SQR(vx);
+          //phydro->u(IEN, k, j, i) = pres*(1.0 + cloud * (pres_c/pres-1))/gm1 + 0.5*nH*(1.0 + cloud * (nH_c/nH - 1))*SQR(vx);
+          phydro->u(IEN, k, j, i) = pres/gm1 + 0.5*nH*SQR(vx);
         }
         if (MAGNETIC_FIELDS_ENABLED) {
-          phydro->u(IEN,k,j,i)+=0.5*SQR(b0*(1.0 + cloud * (b0_c/b0_c-1)));
+          //phydro->u(IEN,k,j,i)+=0.5*SQR(b0*(1.0 + cloud * (b0_c/b0_c-1)));
+          phydro->u(IEN,k,j,i)+=0.5*SQR(b0);
         }
         if(CR_ENABLED){
-          pcr->u_cr(CRE,k,j,i) = 3.0*crpres*(1.0 + cloud * (crpres_c/crpres-1));
+          pcr->u_cr(CRE,k,j,i) = 3.0*crpres;//*(1.0 + cloud * (crpres_c/crpres-1));
           pcr->u_cr(CRF1,k,j,i) = 0.0;
           pcr->u_cr(CRF2,k,j,i) = 0.0;
           pcr->u_cr(CRF3,k,j,i) = 0.0;
@@ -181,8 +193,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             Real x1 = pcoord->x1v(i);
             Real x2 = pcoord->x2f(j);
             Real x3 = pcoord->x3v(k);
-            Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
-            pfield->b.x2f(k,j,i) = b0*(1.0 + cloud * (b0_c/b0_c-1))*std::cos(angle);
+            //Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
+            pfield->b.x2f(k,j,i) = b0*std::cos(angle);//*(1.0 + cloud * (b0_c/b0_c-1));
         }}}
         for (int k=ks; k<=ke+1; k++) {
         for (int j=js; j<=je; j++) {
@@ -190,8 +202,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             Real x1 = pcoord->x1v(i);
             Real x2 = pcoord->x2v(j);
             Real x3 = pcoord->x3f(k);
-            Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
-            pfield->b.x3f(k,j,i) = b0*(1.0 + cloud * (b0_c/b0_c-1)) * std::sin(angle);
+            //Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
+            pfield->b.x3f(k,j,i) = b0* std::sin(angle);//*(1.0 + cloud * (b0_c/b0_c-1)) ;
         }}}
     }else{
       std::stringstream msg;
