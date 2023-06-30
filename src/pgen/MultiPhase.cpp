@@ -42,14 +42,13 @@ Real dTdt(Real T, Real nH);
 Real AdaptiveODESolver(Real T, Real nH, Real dt);
 Real CoolingTimeStep(MeshBlock *pmb);
 int cooling_flag;
-const Real Heat = ;
-const Real Lamb1 = ;
-const Real Lamb2 = 
-const Real T1a = ;
-const Real T1b = ;
-const Real T2 = ; 
-const Real T_floor = ;
-
+const Real Heat    =  3.68962948e+01;
+const Real Lamb1   =  1.34671476e+07;
+const Real Lamb2   =  1.45740365e+01;
+const Real T1a     =  9.77320931e+02;
+const Real T1b     =  1.23815996e+01;
+const Real T2      =  7.59404778e-01;
+const Real T_floor =  4.12719988e-01;
 
 
 Real sigmaParl, sigmaPerp; //CR diffusion 
@@ -262,18 +261,18 @@ void MeshBlock::UserWorkInLoop() {
   return;
 }
 
-Real Cooling(Real T, Real nH){
-  Real CoolingRate = 1e7*std::exp(-1.184e5/(T+1e3))+1.4e-2*std::sqrt(T)*std::exp(-92/T);
-  Real dEdt = (T>T_floor)? nH*HeatingRate*(1.0 - nH*CoolingRate) : nH*HeatingRate;
-  return dEdt;
-}
+// Real Cooling(Real T, Real nH){
+//   Real CoolingRate = 1e7*std::exp(-1.184e5/(T+1e3))+1.4e-2*std::sqrt(T)*std::exp(-92/T);
+//   Real dEdt = (T>T_floor)? nH*HeatingRate*(1.0 - nH*CoolingRate) : nH*HeatingRate;
+//   return dEdt;
+// }
 
-Real dTdt(Real T, Real nH){
-  Real g = peos->GetGamma();
-  Real dEdt = Cooling(T, nH);
-  Real dTdt = dEdt/(kb)*(g-1);
-  return dTdt;
-}
+// Real dTdt(Real T, Real nH){
+//   Real g = peos->GetGamma();
+//   Real dEdt = Cooling(T, nH);
+//   Real dTdt = dEdt/(kb)*(g-1);
+//   return dTdt;
+// }
 
 //========================================================================================
 //! \fn Real AdaptiveODESolver(Real T, Real nH, Real dt)
@@ -363,7 +362,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
         Real T = pmb->phydro->w(IPR,k,j,i)/d;
         Real Lamb = Lamb1*exp(-1*T1a/(T + T1b)) + Lamb2*exp(-1*T2/T);
         Real dEdt = (T > T_floor) ? d*( d*Lamb - Heat ) : -1*d*Heat;
-        Real cool_dt = ( pmb->phydro->w(IPR,k,j,i)/(g-1) )/ dEdt
+        Real cool_dt = ( pmb->phydro->w(IPR,k,j,i)/(g-1) )/ dEdt;
         if (min_dt > cool_dt){
           min_dt   = cool_dt;
         }

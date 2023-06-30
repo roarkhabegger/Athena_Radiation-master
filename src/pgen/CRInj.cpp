@@ -483,6 +483,7 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
   Real a3  =  2.867;
   Real a4  = -0.65;
   Real a5  =  0.5;
+  Mesh *pm = pmb->pmy_mesh;
 
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
