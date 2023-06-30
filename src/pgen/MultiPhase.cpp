@@ -138,6 +138,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
 
+
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
       for (int i=is; i<=ie; ++i) {
