@@ -83,6 +83,7 @@ int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
 int HSE_CR_Forcing;
 int HSE_Gamma;
 int thermal;
+int uniformInj;
 
 
 std::vector<double> X1Inj = {};
@@ -186,64 +187,67 @@ void Mesh::UserWorkAfterLoop(ParameterInput *pin) {
 //----------------------------------------------------------------------------------------
 void Mesh::UserWorkInLoop(void)
 {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  X1Inj.clear();
-  X2Inj.clear();
-  X3Inj.clear();
-  NInjs = 0;
-  if ((dt < FLT_MAX) && (time < StopT)) {
-  if (rank == 0) {
-    Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
-    Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
-    Real x3d = (mesh_size.x3max - mesh_size.x3min)/float(mesh_size.nx3);;
-    //std::cout << mesh_size.x1min << "," << mesh_size.x1max << std::endl;
+  if (uniformInj != 1){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    X1Inj.clear();
+    X2Inj.clear();
+    X3Inj.clear();
+    NInjs = 0;
+    if ((dt < FLT_MAX) && (time < StopT)) {
+    if (rank == 0) {
+      Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
+      Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
+      Real x3d = (mesh_size.x3max - mesh_size.x3min)/float(mesh_size.nx3);;
+      //std::cout << mesh_size.x1min << "," << mesh_size.x1max << std::endl;
 
-    // std::exponential_distribution<double> distDt(SNRate);
-    std::poisson_distribution<int> distN(SNRate*dt);
+      // std::exponential_distribution<double> distDt(SNRate);
+      std::poisson_distribution<int> distN(SNRate*dt);
 
-    std::uniform_real_distribution<double> distx1(mesh_size.x1min,mesh_size.x1max);
-    std::uniform_real_distribution<double> distx2(-1*injH,injH);
-    std::uniform_real_distribution<double> distx3(mesh_size.x3min,mesh_size.x3max);
+      std::uniform_real_distribution<double> distx1(mesh_size.x1min,mesh_size.x1max);
+      std::uniform_real_distribution<double> distx2(-1*injH,injH);
+      std::uniform_real_distribution<double> distx3(mesh_size.x3min,mesh_size.x3max);
 
-    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine gen(seed1);
+      unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+      std::default_random_engine gen(seed1);
 
-    NInjs = distN(gen);
-    for (int n = 1; n <= NInjs; n++){
-      X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
-      X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
-      X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
+      NInjs = distN(gen);
+      for (int n = 1; n <= NInjs; n++){
+        X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
+        X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
+        X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
+      }
+      // while ((lastInjT < time+dt) && (SNRate> 0.0)){
+      //   X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
+      //   X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
+      //   X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
+      //   lastInjT += distDt(gen);
+      //   NInjs +=1;
+      // }
+      // if  (SNRate <= 0.0) {
+      //   lastInjT = time + dt;
+      // }
+      // std::cout << time << " " << NInjs <<std::endl;
+    } 
+    
+    //MPI_Bcast(&lastInjT,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    MPI_Bcast(&NInjs,1,MPI_INT,0,MPI_COMM_WORLD);
+
+    if ((NInjs > 0) && (rank != 0)){
+      X1Inj.insert(X1Inj.end(),NInjs,-15.0);
+      X2Inj.insert(X2Inj.end(),NInjs,-15.0);
+      X3Inj.insert(X3Inj.end(),NInjs,-15.0);
     }
-    // while ((lastInjT < time+dt) && (SNRate> 0.0)){
-    //   X1Inj.insert(X1Inj.end(), round((distx1(gen)-mesh_size.x1min)/x1d)*x1d + mesh_size.x1min + 0.5*x1d);
-    //   X2Inj.insert(X2Inj.end(), round((distx2(gen)-mesh_size.x2min)/x2d)*x2d + mesh_size.x2min + 0.5*x2d);
-    //   X3Inj.insert(X3Inj.end(), round((distx3(gen)-mesh_size.x3min)/x3d)*x3d + mesh_size.x3min + 0.5*x3d);
-    //   lastInjT += distDt(gen);
-    //   NInjs +=1;
-    // }
-    // if  (SNRate <= 0.0) {
-    //   lastInjT = time + dt;
-    // }
-    // std::cout << time << " " << NInjs <<std::endl;
-  } 
-  
-  //MPI_Bcast(&lastInjT,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
-  MPI_Bcast(&NInjs,1,MPI_INT,0,MPI_COMM_WORLD);
 
-  if ((NInjs > 0) && (rank != 0)){
-    X1Inj.insert(X1Inj.end(),NInjs,-15.0);
-    X2Inj.insert(X2Inj.end(),NInjs,-15.0);
-    X3Inj.insert(X3Inj.end(),NInjs,-15.0);
+    MPI_Bcast(&X1Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    MPI_Bcast(&X2Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    MPI_Bcast(&X3Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
+    TotalInjs += NInjs;
+    }
   }
-
-  MPI_Bcast(&X1Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
-  MPI_Bcast(&X2Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
-  MPI_Bcast(&X3Inj[0],NInjs,MPI_DOUBLE,0,MPI_COMM_WORLD);
-  TotalInjs += NInjs;
 }
 
-}
+
 
 
 //Set up initial MESH data
@@ -288,6 +292,7 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   HSE_CR_Forcing = pin->GetOrAddInteger("problem","HSE_CR",0);
   HSE_Gamma= pin->GetOrAddInteger("problem","HSE_G",0);
   thermal = pin->GetOrAddInteger("problem","thermal",0);
+  uniformInj = pin->GetOrAddInteger("problem","uniformInj",0);
   Heat =  pin->GetOrAddReal("problem","Heat",2.68059283e-03) ;
   EnrollUserExplicitSourceFunction(mySource);
   
@@ -415,7 +420,8 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
     // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // std::cout << time << " " << NInjs <<std::endl;
     // if (NInjs == 1) {std::cout << time << " Node " << rank << " has X1=" << X1Inj.at(0) << std::endl;}
-  
+  Mesh *pm = pmb->pmy_mesh;
+
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
   #pragma omp simd
@@ -427,15 +433,15 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
           Real coeff = (beta* pres0)/ (sigmaPerp*SQR(h));
           u_cr(CRE,k,j,i) += arg*coeff*dt;
         }
-        if (thermal==0){
+        if ((thermal==0)&&(uniformInj != 1)){
+          Real x1fl = pmb->pcoord->x1f(i);
+          Real x2fl = pmb->pcoord->x2f(j);
+          Real x3fl = pmb->pcoord->x3f(k);
+          Real x1fr = pmb->pcoord->x1f(i+1);
+          Real x2fr = pmb->pcoord->x2f(j+1);
+          Real x3fr = pmb->pcoord->x3f(k+1);
+          Real Vol = pmb->pcoord->GetCellVolume(k,j,i);
           for (int m = 0 ; m < NInjs; ++m) {
-            Real x1fl = pmb->pcoord->x1f(i);
-            Real x2fl = pmb->pcoord->x2f(j);
-            Real x3fl = pmb->pcoord->x3f(k);
-            Real x1fr = pmb->pcoord->x1f(i+1);
-            Real x2fr = pmb->pcoord->x2f(j+1);
-            Real x3fr = pmb->pcoord->x3f(k+1);
-            Real Vol = pmb->pcoord->GetCellVolume(k,j,i);
             Real x10   = X1Inj.at(m);
             Real x20   = X2Inj.at(m);
             Real x30   = X3Inj.at(m);
@@ -443,6 +449,13 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
             // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
               u_cr(CRE,k,j,i) += Esn/Vol;
             }
+          }
+        }
+        if ((thermal==0)&&(uniformInj == 1)){
+          Real x2v = abs(pmb->pcoord->x2v(j));
+          Real Vol = 2*injH*(pm->mesh_size.x1max - pm->mesh_size.x1min)*(pm->mesh_size.x3max - pm->mesh_size.x3min);
+          if (x2v < injH) {
+            u_cr(CRE,k,j,i) += Esn/Vol*SNRate*dt;
           }
         }
       }
@@ -507,21 +520,29 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           // Lamb = 1e-2;
           cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
         }
-        if (thermal==1){
+        if ((thermal==1)&&(uniformInj != 1)){
+          Real x1fl = pmb->pcoord->x1f(i);
+          Real x2fl = pmb->pcoord->x2f(j);
+          Real x3fl = pmb->pcoord->x3f(k);
+          Real x1fr = pmb->pcoord->x1f(i+1);
+          Real x2fr = pmb->pcoord->x2f(j+1);
+          Real x3fr = pmb->pcoord->x3f(k+1);
+          Real Vol = pmb->pcoord->GetCellVolume(k,j,i);
           for (int m = 0 ; m < NInjs; ++m) {
-            Real x1fl = pmb->pcoord->x1f(i);
-            Real x2fl = pmb->pcoord->x2f(j);
-            Real x3fl = pmb->pcoord->x3f(k);
-            Real x1fr = pmb->pcoord->x1f(i+1);
-            Real x2fr = pmb->pcoord->x2f(j+1);
-            Real x3fr = pmb->pcoord->x3f(k+1);
             Real x10   = X1Inj.at(m);
             Real x20   = X2Inj.at(m);
             Real x30   = X3Inj.at(m);
             if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
             // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
-              cons(IEN,k,j,i) += Esn;
+              cons(IEN,k,j,i) += Esn/Vol;
             }
+          }
+        }
+        if ((thermal==1)&&(uniformInj == 1)){
+          Real x2v = abs(pmb->pcoord->x2v(j));
+          Real Vol = 2*injH*(pm->mesh_size.x1max - pm->mesh_size.x1min)*(pm->mesh_size.x3max - pm->mesh_size.x3min);
+          if (x2v < injH) {
+            cons(IEN,k,j,i) += Esn/Vol*SNRate*dt;
           }
         }
       }

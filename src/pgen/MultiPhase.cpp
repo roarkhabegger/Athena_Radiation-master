@@ -42,7 +42,15 @@ Real dTdt(Real T, Real nH);
 Real AdaptiveODESolver(Real T, Real nH, Real dt);
 Real CoolingTimeStep(MeshBlock *pmb);
 int cooling_flag;
-const Real T_floor = 50.0;
+const Real Heat = ;
+const Real Lamb1 = ;
+const Real Lamb2 = 
+const Real T1a = ;
+const Real T1b = ;
+const Real T2 = ; 
+const Real T_floor = ;
+
+
 
 Real sigmaParl, sigmaPerp; //CR diffusion 
                            //decouple parallel and perpendicular to the local magnetic field
@@ -52,6 +60,11 @@ void Diffusion(MeshBlock *pmb, AthenaArray<Real> &u_cr,
 void CRSource(MeshBlock *pmb, const Real time, const Real dt,
                const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
                AthenaArray<Real> &u_cr);
+void mySource(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &cons);
+
+
 //========================================================================================
 //! \fn void Mesh::InitUserMeshBlockData(ParameterInput *pin)
 //  \brief
@@ -68,12 +81,7 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 //  \brief
 //========================================================================================
 void Mesh::InitUserMeshData(ParameterInput *pin) {
-  if (SELF_GRAVITY_ENABLED) {
-    Real four_pi_G = pin->GetReal("problem","four_pi_G");
-    Real eps = pin->GetOrAddReal("problem","grav_eps", 0.0);
-    SetFourPiG(four_pi_G);
-    SetGravityThreshold(eps);
-  }
+
   if(CR_ENABLED){
     //Load CR Variables
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
@@ -82,7 +90,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   }
   cooling_flag = pin->GetInteger("problem","cooling");
   if (cooling_flag != 0) {
-	EnrollUserTimeStepFunction(CoolingTimeStep);
+	  EnrollUserTimeStepFunction(CoolingTimeStep);
+    EnrollUserExplicitSourceFunction(mySource);
   }
   // turb_flag is initialzed in the Mesh constructor to 0 by default;
   // turb_flag = 1 for decaying turbulence
@@ -128,23 +137,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   const Real invbetaCR = pin->GetOrAddReal("problem","invbetaCR",0.0);
   const Real crpres = pres*invbetaCR;
-<<<<<<< HEAD
-  const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
-  
-  const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
-  const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
-  const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
-  const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
-  const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
-=======
-
-  // const Real nH_c = pin->GetOrAddReal("problem","nH_c", nH);
-  // const Real pres_c = pin->GetOrAddReal("problem","pres_c", pres);
-  // const Real b0_c = pin->GetOrAddReal("problem","b0_c",b0);
-  // const Real crpres_c = pin->GetOrAddReal("problem","crpres_c",crpres);
-  // const Real rad_c = pin->GetOrAddReal("problem","rad_c",0.0);
-  // const Real wid_c = pin->GetOrAddReal("problem","wid_c",0.0001);
->>>>>>> acd801a6a536a7b762c7dfa404cf07dc42988317
 
   for (int k=ks; k<=ke; ++k) {
     for (int j=js; j<=je; ++j) {
@@ -185,7 +177,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
         for (int k=ks; k<=ke; k++) {
         for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie+1; i++) {
-            pfield->b.x1f(k,j,i) = 0;
+            Real x1 = pcoord->x1f(i);
+            Real x2 = pcoord->x2v(j);
+            Real x3 = pcoord->x3v(k);
+            pfield->b.x1f(k,j,i) = b0*std::cos(angle);
         }}}
         for (int k=ks; k<=ke; k++) {
         for (int j=js; j<=je+1; j++) {
@@ -194,16 +189,16 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
             Real x2 = pcoord->x2f(j);
             Real x3 = pcoord->x3v(k);
             //Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
-            pfield->b.x2f(k,j,i) = b0*std::cos(angle);//*(1.0 + cloud * (b0_c/b0_c-1));
+            pfield->b.x2f(k,j,i) = b0* std::sin(angle);//*(1.0 + cloud * (b0_c/b0_c-1));
         }}}
         for (int k=ks; k<=ke+1; k++) {
         for (int j=js; j<=je; j++) {
         for (int i=is; i<=ie; i++) {
-            Real x1 = pcoord->x1v(i);
-            Real x2 = pcoord->x2v(j);
-            Real x3 = pcoord->x3f(k);
+            // Real x1 = pcoord->x1v(i);
+            // Real x2 = pcoord->x2v(j);
+            // Real x3 = pcoord->x3f(k);
             //Real cloud = 0.5*(1-tanh( (sqrt(SQR(x1) + SQR(x2) + SQR(x3)) - rad_c)/wid_c ));
-            pfield->b.x3f(k,j,i) = b0* std::sin(angle);//*(1.0 + cloud * (b0_c/b0_c-1)) ;
+            pfield->b.x3f(k,j,i) = 0.0;//*(1.0 + cloud * (b0_c/b0_c-1)) ;
         }}}
     }else{
       std::stringstream msg;
@@ -229,53 +224,53 @@ void Mesh::UserWorkAfterLoop(ParameterInput *pin) {
 //  \brief Time-Intregator for adaptive Solver Method Solver
 //========================================================================================
 void MeshBlock::UserWorkInLoop() {
-  const Real kb  = 1.381e-16;
-  const Real unit_length_in_cm_  = 3.086e+18;
-  const Real unit_vel_in_cms_    = 1.0e5;
-  const Real unit_density_in_nH_ = 1;
-  const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
-                             * unit_vel_in_cms_ * unit_vel_in_cms_;
-  const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
-  Real dt = pmy_mesh->dt*unit_time_in_s_;
-  Real g = peos->GetGamma(); //Gamma
-  Real nH,e,E_ergs,T,T_next,e_next;
-  if (cooling_flag != 0) {
-  for (int k=ks-NGHOST; k<=ke+NGHOST; ++k) {
-    for (int j=js-NGHOST; j<=je+NGHOST; ++j) {
-#pragma omp simd
-      for (int i=is-NGHOST; i<=ie+NGHOST; ++i) {
-        nH     = phydro->u(IDN,k,j,i)*unit_density_in_nH_;
-        e      = phydro->w(IPR,k,j,i)/(g-1.0);
-        E_ergs = e* unit_E_in_cgs_ / nH;
-        // T      = E_ergs / (1.5*kb); //Why forced to be gamma=5/3 with 1.5 = 1/(g-1)
-		T      = E_ergs*(g-1) / kb;
-        T      = (T > T_floor) ? T : T_floor;
-        T_next = AdaptiveODESolver(T,nH,dt);
-        //std::cout<<"T = "<<T<<"T_next = "<<T_next<<std::endl;
-        if (T_next < T_floor) {
-          e_next = T_floor*(1.5*kb)*nH/unit_E_in_cgs_;
-        }else{
-          e_next = T_next*(1.5*kb)*nH/unit_E_in_cgs_;
-        }
-        phydro->u(IPR,k,j,i) += (e_next-e)*(g-1.0);
-        phydro->w(IEN,k,j,i) += (e_next-e); 
-      }
-    }
-  }
-  }
+//   const Real kb  = 1.381e-16;
+//   const Real unit_length_in_cm_  = 3.086e+18;
+//   const Real unit_vel_in_cms_    = 1.0e5;
+//   const Real unit_density_in_nH_ = 1;
+//   const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
+//                              * unit_vel_in_cms_ * unit_vel_in_cms_;
+//   const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
+//   Real dt = pmy_mesh->dt*unit_time_in_s_;
+//   Real g = peos->GetGamma(); //Gamma
+//   Real nH,p,P_cgs,T,T_next,P_next;
+//   if (cooling_flag != 0) {
+//   for (int k=ks-NGHOST; k<=ke+NGHOST; ++k) {
+//     for (int j=js-NGHOST; j<=je+NGHOST; ++j) {
+// #pragma omp simd
+//       for (int i=is-NGHOST; i<=ie+NGHOST; ++i) {
+//         nH     = phydro->u(IDN,k,j,i)*unit_density_in_nH_;
+//         p      = phydro->w(IPR,k,j,i);
+//         P_cgs  = p * unit_E_in_cgs_ ;
+//         // T      = E_ergs / (1.5*kb); //Why forced to be gamma=5/3 with 1.5 = 1/(g-1)
+// 		    T      = P_cgs / (kb*nH);
+//         T      = (T > T_floor) ? T : T_floor;
+//         T_next = AdaptiveODESolver(T,nH,dt);
+//         //std::cout<<"T = "<<T<<"T_next = "<<T_next<<std::endl;
+//         if (T_next < T_floor) {
+//           P_next = T_floor*kb*nH/unit_E_in_cgs_;
+//         }else{
+//           P_next = T_next*kb*nH/unit_E_in_cgs_;
+//         }
+//         phydro->w(IPR,k,j,i) += (P_next-P);
+//         phydro->u(IEN,k,j,i) += (P_next-P)/(g-1); 
+//       }
+//     }
+//   }
+//   }
+  return;
 }
 
 Real Cooling(Real T, Real nH){
-  const Real HeatingRate = 2e-26;
   Real CoolingRate = 1e7*std::exp(-1.184e5/(T+1e3))+1.4e-2*std::sqrt(T)*std::exp(-92/T);
   Real dEdt = (T>T_floor)? nH*HeatingRate*(1.0 - nH*CoolingRate) : nH*HeatingRate;
   return dEdt;
 }
 
 Real dTdt(Real T, Real nH){
-  const Real kb  = 1.381e-16;
+  Real g = peos->GetGamma();
   Real dEdt = Cooling(T, nH);
-  Real dTdt = dEdt/(kb*1.5);
+  Real dTdt = dEdt/(kb)*(g-1);
   return dTdt;
 }
 
@@ -283,87 +278,126 @@ Real dTdt(Real T, Real nH){
 //! \fn Real AdaptiveODESolver(Real T, Real nH, Real dt)
 //  \brief Applying the Adaptive sub-cycle method O(h^2) to solve the cooling function 
 //========================================================================================
-Real AdaptiveODESolver(Real T, Real nH, Real dt) {
-  const Real tol  = 1e-1;
-  const Real tolmin = 1e-4;
-  const Real minh = 1e-10;
-  const int Maxiter = 100000;
-  Real T0 = T;
-  Real Tn,T_huan,err,t_reamin,s1,s2;
-  Real  t = 0.0;
-  Real  h = dt/2;
-  int  iter = 0;
-  while ( iter < Maxiter & t < dt){
-    s1 = dTdt(T ,nH);
-    Tn = T0 + h*s1;
-    s2 = dTdt(Tn,nH);
-    T_huan = T0 + h*(s1+s2)/2;
-    err = std::abs(T_huan - Tn);
-    if (err > tol ){
-      // error is too large, recompute the cycle with smaller h
-      h /= 2;
-    }else if ( err < tolmin ){
-      // take the result but increasing h by a factor of 2
-      t += h;
-      t_reamin = dt - t;
-      T0 = T_huan;
-      h  =  (t_reamin > 2*h )? 2*h : t_reamin;
-    }else if ( tol > err > tolmin ){
-      // take the result
-      t += h;
-      t_reamin = dt - t;
-      T0 = T_huan;
-      h  =  (t_reamin > h )? h : t_reamin;
-    }else if (h<minh){
-      std::stringstream msg;
-      msg << "### FATAL ERROR in ProblemGenerator::AdaptiveODESolver" << std::endl
-          << "h < minh, Solution is not convergence!" << std::endl
-          << "T0 = "<< T <<", nH = "<<nH<<", dt ="<<dt << std::endl;
-      throw std::runtime_error(msg.str().c_str());
+// Real AdaptiveODESolver(Real T, Real nH, Real dt) {
+//   const Real tol  = 1e-1;
+//   const Real tolmin = 1e-4;
+//   const Real minh = 1e-10;
+//   const int Maxiter = 100000;
+//   Real T0 = T;
+//   Real Tn,T_huan,err,t_reamin,s1,s2;
+//   Real  t = 0.0;
+//   Real  h = dt/2;
+//   int  iter = 0;
+//   while ( iter < Maxiter & t < dt){
+//     s1 = dTdt(T ,nH);
+//     Tn = T0 + h*s1;
+//     s2 = dTdt(Tn,nH);
+//     T_huan = T0 + h*(s1+s2)/2;
+//     err = std::abs(T_huan - Tn);
+//     if (err > tol ){
+//       // error is too large, recompute the cycle with smaller h
+//       h /= 2;
+//     }else if ( err < tolmin ){
+//       // take the result but increasing h by a factor of 2
+//       t += h;
+//       t_reamin = dt - t;
+//       T0 = T_huan;
+//       h  =  (t_reamin > 2*h )? 2*h : t_reamin;
+//     }else if ( tol > err > tolmin ){
+//       // take the result
+//       t += h;
+//       t_reamin = dt - t;
+//       T0 = T_huan;
+//       h  =  (t_reamin > h )? h : t_reamin;
+//     }else if (h<minh){
+//       std::stringstream msg;
+//       msg << "### FATAL ERROR in ProblemGenerator::AdaptiveODESolver" << std::endl
+//           << "h < minh, Solution is not convergence!" << std::endl
+//           << "T0 = "<< T <<", nH = "<<nH<<", dt ="<<dt << std::endl;
+//       throw std::runtime_error(msg.str().c_str());
+//     }
+//     iter+=1;
+//   }
+
+//   if (iter == Maxiter){
+//     std::stringstream msg;
+//     msg << "### FATAL ERROR in ProblemGenerator::AdaptiveODESolver" << std::endl
+//         << "iter = Maxiter, Solution is not convergence!" << std::endl
+//         << "T0 = "<< T <<"nH = "<<nH<<", dt ="<<dt << std::endl;
+//     throw std::runtime_error(msg.str().c_str());
+//   }
+
+//   return Tn;
+// }
+
+void mySource(MeshBlock *pmb, const Real time, const Real dt,
+               const AthenaArray<Real> &prim, const AthenaArray<Real> &bcc,
+               AthenaArray<Real> &cons){
+
+  for (int k=pmb->ks; k<=pmb->ke; ++k) {
+    for (int j=pmb->js; j<=pmb->je; ++j) {
+#pragma omp simd
+      for (int i=pmb->is; i<=pmb->ie; ++i) {
+        Real d = prim(IDN,k,j,i);
+        Real T = prim(IPR,k,j,i)/d;
+        Real Lamb = Lamb1*exp(-1*T1a/(T + T1b)) + Lamb2*exp(-1*T2/T);
+        Real dEdt = (T > T_floor) ? d*( d*Lamb - Heat ) : -1*d*Heat;
+        cons(IEN,k,j,i) -= dEdt*dt;
+      }
     }
-    iter+=1;
   }
+  return;
 
-  if (iter == Maxiter){
-    std::stringstream msg;
-    msg << "### FATAL ERROR in ProblemGenerator::AdaptiveODESolver" << std::endl
-        << "iter = Maxiter, Solution is not convergence!" << std::endl
-        << "T0 = "<< T <<"nH = "<<nH<<", dt ="<<dt << std::endl;
-    throw std::runtime_error(msg.str().c_str());
-  }
-
-  return Tn;
 }
 
+
 Real CoolingTimeStep(MeshBlock *pmb){
-  const Real unit_length_in_cm_  = 3.086e+18;
-  const Real unit_vel_in_cms_    = 1.0e5;
-  const Real unit_density_in_nH_ = 1;
-  const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
-                             * unit_vel_in_cms_ * unit_vel_in_cms_;
-  const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
-  const Real  g = 5.0/3.0;
-  Real min_dt = 0.3*pmb->pcoord->dx1f(0)/std::abs(pmb->phydro->u(IVX,pmb->ke,pmb->je,pmb->ie));
+
+  Real min_dt=pmb->pcoord->dx1f(0)/pmb->pcr->vmax;
+  Real g = pmb->peos->GetGamma();
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
       for (int i=pmb->is; i<=pmb->ie; ++i) {
-        Real   nH   = pmb->phydro->u(IDN,k,j,i)*unit_density_in_nH_;
-        Real   ED   = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
-        Real E_ergs = ED * unit_E_in_cgs_ / nH;
-        Real     T  =  E_ergs / (1.5*1.381e-16);
-        Real Heating = 2e-26;
-        Real Cooling = 2e-26*nH*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
-        Real dEdt    = Heating;
-        if (T > T_floor) {
-          dEdt = dEdt - Cooling;
-        }
-        Real cool_dt = std::abs(0.015*E_ergs/dEdt/unit_time_in_s_);
+        Real d = pmb->phydro->w(IDN,k,j,i);
+        Real T = pmb->phydro->w(IPR,k,j,i)/d;
+        Real Lamb = Lamb1*exp(-1*T1a/(T + T1b)) + Lamb2*exp(-1*T2/T);
+        Real dEdt = (T > T_floor) ? d*( d*Lamb - Heat ) : -1*d*Heat;
+        Real cool_dt = ( pmb->phydro->w(IPR,k,j,i)/(g-1) )/ dEdt
         if (min_dt > cool_dt){
           min_dt   = cool_dt;
         }
       }
     }
   }
+
+  // const Real unit_length_in_cm_  = 3.086e+18;
+  // const Real unit_vel_in_cms_    = 1.0e5;
+  // const Real unit_density_in_nH_ = 1;
+  // const Real unit_E_in_cgs_ = 1.67e-24 * 1.4 * unit_density_in_nH_
+  //                            * unit_vel_in_cms_ * unit_vel_in_cms_;
+  // const Real unit_time_in_s_ = unit_length_in_cm_/unit_vel_in_cms_;
+  // Real g = peos->GetGamma();
+  // Real min_dt = 0.3*pmb->pcoord->dx1f(0)/std::abs(pmb->phydro->u(IVX,pmb->ke,pmb->je,pmb->ie));
+  // for (int k=pmb->ks; k<=pmb->ke; ++k) {
+  //   for (int j=pmb->js; j<=pmb->je; ++j) {
+  //     for (int i=pmb->is; i<=pmb->ie; ++i) {
+  //       Real   nH   = pmb->phydro->u(IDN,k,j,i)*unit_density_in_nH_;
+  //       Real   ED   = pmb->phydro->w(IPR,k,j,i)/(g-1.0);
+  //       Real E_ergs = ED * unit_E_in_cgs_ / nH;
+  //       Real     T  =  E_ergs / (1.5*1.381e-16);
+  //       Real Heating = 2e-26;
+  //       Real Cooling = 2e-26*nH*(1e7*exp(-1.184e5/(T+ 1e3)) + 1.4e-2*sqrt(T)*exp(-92/T));
+  //       Real dEdt    = Heating;
+  //       if (T > T_floor) {
+  //         dEdt = dEdt - Cooling;
+  //       }
+  //       Real cool_dt = std::abs(0.015*E_ergs/dEdt/unit_time_in_s_);
+  //       if (min_dt > cool_dt){
+  //         min_dt   = cool_dt;
+  //       }
+  //     }
+  //   }
+  // }
   return min_dt;
 }
 
