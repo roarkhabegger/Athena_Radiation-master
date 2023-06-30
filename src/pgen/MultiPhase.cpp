@@ -362,7 +362,7 @@ Real CoolingTimeStep(MeshBlock *pmb){
         Real T = pmb->phydro->w(IPR,k,j,i)/d;
         Real Lamb = Lamb1*exp(-1*T1a/(T + T1b)) + Lamb2*exp(-1*T2/T);
         Real dEdt = (T > T_floor) ? d*( d*Lamb - Heat ) : -1*d*Heat;
-        Real cool_dt = ( pmb->phydro->w(IPR,k,j,i)/(g-1) )/ dEdt;
+        Real cool_dt = abs( ( pmb->phydro->w(IPR,k,j,i)/(g-1) )/ dEdt);
         if (min_dt > cool_dt){
           min_dt   = cool_dt;
         }
