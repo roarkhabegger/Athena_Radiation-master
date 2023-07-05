@@ -96,6 +96,12 @@ double SNRate = 0.0;
 double injH = 0.1;
 double Esn = 0.0;
 double StopT = -1.0;
+
+double phasesX[5];
+double phasesY[5];
+double amplitudes[5];
+
+
 // std::vector<float> injE  = { };
 // std::vector<float> injTr = { };
 // std::vector<float> injTf = { };
@@ -306,6 +312,20 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
       EnrollUserCRBoundaryFunction(outer_x2, DiodeCROuterX2);
   }
 
+  if (uniformInj==1) {
+    std::uniform_real_distribution<double> distPhase(-1*M_PI,M_PI);
+    std::uniform_real_distribution<double> distAmp(-1,1);
+
+    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine gen(seed1);
+    for (int m =1; m<=5; m++){
+      phasesX[m-1] = distPhase(gen);
+      phasesY[m-1] = distPhase(gen);
+      amplitudes[m-1] = distAmp(gen);
+      
+    }
+  }
+
 }
 
 //Setup initial mesh and variables
@@ -325,6 +345,17 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         phydro->u(IM2,k,j,i) = 0.0;
         phydro->u(IM3,k,j,i) = 0.0;
         phydro->u(IEN,k,j,i) = pressure/(myGamma-1) ;//+ pot;
+
+        if (uniformInj==1) {
+          Real pert = 0.0;
+          for (int m =1; m<=5; m++){
+            pert += amplitudes[m-1]*sin(M_PI*m*x1+phasesX[m-1])*sin(M_PI*m*x3+phasesY[m-1]);
+          }
+          pert *= 1e-5;
+          phydro->u(IDN,k,j,i) += density*pert;
+          //phydro->u(IM2,k,j,i) += density*pert;
+          //phydro->u(IEN,k,j,i) += 0.5*density*SQR(pert);
+        }
 
         if(CR_ENABLED){
           // get CR parameters
