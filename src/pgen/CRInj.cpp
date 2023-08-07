@@ -96,6 +96,7 @@ double SNRate = 0.0;
 double injH = 0.1;
 double Esn = 0.0;
 double StopT = -1.0;
+int StopN = -1;
 
 double phasesX[5];
 double phasesY[5];
@@ -200,7 +201,7 @@ void Mesh::UserWorkInLoop(void)
     X2Inj.clear();
     X3Inj.clear();
     NInjs = 0;
-    if ((dt < FLT_MAX) && (time < StopT)) {
+    if ((dt < FLT_MAX) && (time < StopT) && (TotalInjs < StopN)) {
     if (rank == 0) {
       Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
       Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
@@ -281,7 +282,8 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     sigmaParl = pin->GetReal("cr","sigmaParl");
     SNRate = pin->GetReal("problem","SNRate");
     injH = pin->GetOrAddReal("problem","InjH",0.1);
-    StopT = pin->GetReal("problem","Stop");
+    StopT = pin->GetReal("problem","StopT");
+    StopN = pin->GetReal("problem","StopN");
     Esn = pin->GetOrAddReal("problem","Esn",5.57952651e-02); // CR Energy Density from a Supernova distributed in one cell
     //.        Esn, Rad, tRise, tFall, t0, x10, x20, x30 
   }  
@@ -514,6 +516,15 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
   Real a3  =  2.867;
   Real a4  = -0.65;
   Real a5  =  0.5;
+
+  Real I1   = 1.44057504e+01 ;
+  Real I2   = 1.55897847e-05 ;
+  Real It1a = 1.02221922e-03 ;
+  Real It1b = 1.29504125e-05 ;
+  Real It2  = 7.94291964e-07 ;
+
+  
+
   Mesh *pm = pmb->pmy_mesh;
 
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
@@ -532,6 +543,7 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
 
         //COOLING
         if (cooling == 1) {
+          //CIE fit
           Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
           Real n = prim(IDN,k,j,i);
           Real Lamb = 0.0;
@@ -550,6 +562,16 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
             Lamb = A5 * pow(temp,a5);
           }
           // Lamb = 1e-2;
+          cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
+        } else if (cooling == 2) { 
+          // Inoue 2006
+          Real temp = prim(IPR,k,j,i)/prim(IDN,k,j,i);
+          Real n = prim(IDN,k,j,i);
+          Real Lamb = 0.0;
+          Real Gam = Heat*dens0;
+          if (HSE_Gamma == 1) Gam *=  pow(cosh(x2/(nGrav*h)),-1.0*nGrav);
+
+          Lamb = I1 * exp(-1*It1a/(temp + It1b)) + I2*exp(-1*It2/temp);
           cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
         }
         if ((thermal==1)&&(uniformInj != 1)){
