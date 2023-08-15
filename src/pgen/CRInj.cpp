@@ -82,7 +82,6 @@ const Real float_min{std::numeric_limits<float>::min()};
 int cooling; //Boolean - if cooling==1 do Inoue 2006 2 phase gas cooling profile
 int HSE_CR_Forcing;
 int HSE_Gamma;
-int thermal;
 int uniformInj;
 
 
@@ -94,9 +93,9 @@ int TotalInjs = 0;
 // double lastInjT = 0.0;
 double SNRate = 0.0;
 double injH = 0.1;
-double Esn = 0.0;
+double Esn_cr = 0.0;
+double Esn_th = 0.0;
 double StopT = -1.0;
-int StopN = -1;
 
 double phasesX[5];
 double phasesY[5];
@@ -201,7 +200,7 @@ void Mesh::UserWorkInLoop(void)
     X2Inj.clear();
     X3Inj.clear();
     NInjs = 0;
-    if ((dt < FLT_MAX) && (time < StopT) && (TotalInjs < StopN)) {
+    if ((dt < FLT_MAX) && (time < StopT) ) {
     if (rank == 0) {
       Real x1d = (mesh_size.x1max - mesh_size.x1min)/float(mesh_size.nx1);
       Real x2d = (mesh_size.x2max - mesh_size.x2min)/float(mesh_size.nx2);;
@@ -262,29 +261,43 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   myGamma = pin->GetReal("hydro","gamma");
 
   // Load variables
-  nGrav = pin->GetReal("problem","GravNumScaleHeight");
+  
   beta = pin->GetReal("problem","beta");
   alpha = pin->GetReal("problem","alpha");
   angle = pin->GetReal("problem","angle");
-  pres0 = pin->GetReal("problem","Pres");
 
-  dens0 = pin->GetReal("problem","Dens");
+  Real T0 = pin->GetReal("problem", "T0"); // now T is in K
+  Real n0 = pin->GetReal("problem", "n0"); // midplane particles per ccm
 
-  g0 =pin->GetReal("problem","Grav");
-  h  =pin->GetReal("problem","ScaleH");
+
+  pres0 = n0*T0*8.63360831e-09; // comes from 1 K *c.k_B / cm^3 in 1 Myr and 1kpc units
+
+  dens0 = n0;
+
+  Real SigmaStar = pin->GetReal("problem","SigmaStar"); // in Msun / pc^2
+
+  g0 = SigmaStar * 2.82649226e-05; // 2pi G * 1 Msun/pc^2 in units kpc/Myr^2
+  Real HStar =pin->GetReal("problem","HStar"); // in kpc
+
+  h = pres0/(g0*dens0)*(1 + alpha + beta);
+
+  nGrav = HStar/h;
   
   dfloor = pin->GetReal("hydro", "dfloor") ;
   pfloor = pin->GetReal("hydro", "pfloor") ;
-  
+
+  SNRate = pin->GetReal("problem","SNRate");
+  injH = pin->GetOrAddReal("problem","InjH",0.1); // in kpc
+  StopT = pin->GetReal("problem","StopT");
+  Esn_th = pin->GetOrAddReal("problem","Esn_th",5.57952651e-02);
+  Esn_cr = pin->GetOrAddReal("problem","Esn_cr",5.57952651e-02);
+
   if(CR_ENABLED){
     //Load CR Variables 
     sigmaPerp = pin->GetReal("cr","sigmaPerp");
     sigmaParl = pin->GetReal("cr","sigmaParl");
-    SNRate = pin->GetReal("problem","SNRate");
-    injH = pin->GetOrAddReal("problem","InjH",0.1);
-    StopT = pin->GetReal("problem","StopT");
-    StopN = pin->GetReal("problem","StopN");
-    Esn = pin->GetOrAddReal("problem","Esn",5.57952651e-02); // CR Energy Density from a Supernova distributed in one cell
+  
+     // CR Energy Density from a Supernova distributed in one cell
     //.        Esn, Rad, tRise, tFall, t0, x10, x20, x30 
   }  
   // MHD boundary conditions
@@ -299,7 +312,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   cooling = pin->GetOrAddInteger("problem","cooling",0);
   HSE_CR_Forcing = pin->GetOrAddInteger("problem","HSE_CR",0);
   HSE_Gamma= pin->GetOrAddInteger("problem","HSE_G",0);
-  thermal = pin->GetOrAddInteger("problem","thermal",0);
   uniformInj = pin->GetOrAddInteger("problem","uniformInj",0);
   Heat =  pin->GetOrAddReal("problem","Heat",2.68059283e-03) ;
   EnrollUserExplicitSourceFunction(mySource);
@@ -454,7 +466,7 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
     // std::cout << time << " " << NInjs <<std::endl;
     // if (NInjs == 1) {std::cout << time << " Node " << rank << " has X1=" << X1Inj.at(0) << std::endl;}
   Mesh *pm = pmb->pmy_mesh;
-
+  if ((HSE_CR_Forcing == 1) || (Esn_cr > 0.0)) {
   for (int k=pmb->ks; k<=pmb->ke; ++k) {
     for (int j=pmb->js; j<=pmb->je; ++j) {
   #pragma omp simd
@@ -466,7 +478,7 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
           Real coeff = (beta* pres0)/ (sigmaPerp*SQR(h));
           u_cr(CRE,k,j,i) += arg*coeff*dt;
         }
-        if ((thermal==0)&&(uniformInj != 1)){
+        if (uniformInj != 1){
           Real x1fl = pmb->pcoord->x1f(i);
           Real x2fl = pmb->pcoord->x2f(j);
           Real x3fl = pmb->pcoord->x3f(k);
@@ -480,19 +492,20 @@ void CRSource(MeshBlock *pmb, const Real time, const Real dt,
             Real x30   = X3Inj.at(m);
             if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
             // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
-              u_cr(CRE,k,j,i) += Esn/Vol;
+              u_cr(CRE,k,j,i) += Esn_cr/Vol;
             }
           }
         }
-        if ((thermal==0)&&(uniformInj == 1)){
+        if (uniformInj == 1){
           Real x2v = abs(pmb->pcoord->x2v(j));
           Real Vol = 2*injH*(pm->mesh_size.x1max - pm->mesh_size.x1min)*(pm->mesh_size.x3max - pm->mesh_size.x3min);
           if (x2v < injH) {
-            u_cr(CRE,k,j,i) += Esn/Vol*SNRate*dt;
+            u_cr(CRE,k,j,i) += Esn_cr/Vol*SNRate*dt;
           }
         }
       }
     }
+  }
   }
   return;
 }
@@ -574,7 +587,7 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
           Lamb = I1 * exp(-1*It1a/(temp + It1b)) + I2*exp(-1*It2/temp);
           cons(IEN,k,j,i) -= dt*(Lamb*pow(n,2.0) - Gam*n);
         }
-        if ((thermal==1)&&(uniformInj != 1)){
+        if ((Esn_th>0.0)&&(uniformInj != 1)){
           Real x1fl = pmb->pcoord->x1f(i);
           Real x2fl = pmb->pcoord->x2f(j);
           Real x3fl = pmb->pcoord->x3f(k);
@@ -588,15 +601,15 @@ void mySource(MeshBlock *pmb, const Real time, const Real dt,
             Real x30   = X3Inj.at(m);
             if ((x10<x1fr) && (x10>x1fl) && (x20<x2fr) && (x20>x2fl) && (x30<x3fr) && (x30>x3fl) ) {
             // std::cout << "  injection " << m << " at " <<  x10 << "," << x20 << "," << x30 <<std::endl;
-              cons(IEN,k,j,i) += Esn/Vol;
+              cons(IEN,k,j,i) += Esn_th/Vol;
             }
           }
         }
-        if ((thermal==1)&&(uniformInj == 1)){
+        if ((Esn_th>0.0)&&(uniformInj == 1)){
           Real x2v = abs(pmb->pcoord->x2v(j));
           Real Vol = 2*injH*(pm->mesh_size.x1max - pm->mesh_size.x1min)*(pm->mesh_size.x3max - pm->mesh_size.x3min);
           if (x2v < injH) {
-            cons(IEN,k,j,i) += Esn/Vol*SNRate*dt;
+            cons(IEN,k,j,i) += Esn_th/Vol*SNRate*dt;
           }
         }
       }
